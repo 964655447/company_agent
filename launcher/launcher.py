@@ -86,23 +86,25 @@ def check_tcp(host: str, port: int, timeout: float = 1.5) -> bool:
         s.close()
 
 
-def _http_probe(url: str, timeout: float = 3.0) -> tuple[int, str]:
-    """GET 请求，返回 (状态码, 响应体前 8KB)。连接失败返回 (-1, "")。
+def _http_probe(url: str, timeout: float = 3.0) -> tuple[int, str, str]:
+    """GET 请求，返回 (状态码, 响应体前 8KB, Content-Type)。连接失败返回 (-1, "", "")。
 
-    与旧的 check_http 不同：4xx/5xx 也带上响应体，便于做内容指纹判断。
+    与旧的 check_http 不同：4xx/5xx 也带上响应体与类型，便于做内容指纹判断。
     """
     try:
         req = urllib.request.Request(url, method="GET",
                                      headers={"User-Agent": "company-launcher"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.status, r.read(8192).decode("utf-8", "replace")
+            ctype = r.headers.get("Content-Type", "")
+            return r.status, r.read(8192).decode("utf-8", "replace"), ctype
     except urllib.error.HTTPError as e:
         try:
-            return e.code, e.read(8192).decode("utf-8", "replace")
+            ctype = e.headers.get("Content-Type", "") if e.headers else ""
+            return e.code, e.read(8192).decode("utf-8", "replace"), ctype
         except Exception:
-            return e.code, ""
+            return e.code, "", ""
     except Exception:
-        return -1, ""
+        return -1, "", ""
 
 
 def check_http(url: str, timeout: float = 3.0) -> bool:
@@ -135,7 +137,7 @@ def check_backend() -> dict:
     url = f"http://127.0.0.1:{BACKEND_PORT}/api/health"
     if not check_tcp("127.0.0.1", BACKEND_PORT):
         return {"ok": False, "detail": f"未启动（{BACKEND_PORT} 端口未开放）"}
-    code, body = _http_probe(url)
+    code, body, _ = _http_probe(url)
     if code == 200 and "ok" in body.lower():
         return {"ok": True, "detail": f"运行中（{BACKEND_PORT}）"}
     if code >= 0:
@@ -144,13 +146,61 @@ def check_backend() -> dict:
     return {"ok": False, "detail": f"后端无响应（{BACKEND_PORT}）"}
 
 
-def check_dify() -> dict:
-    """Dify 检测：必须验证响应内容确实是 Dify，不能只看端口是否开放。
+# Dify 内容指纹：每个元素是 (探测路径, 命中条件)
+# Dify 内容指纹：仅作为 docker 不可用时的兜底探测
+#  - /logo/logo.svg 是 Dify 独有静态资源，返回 Content-Type=image/svg+xml（Steam++ 等不会服务该路径）
+#  - /signin /console 的 HTML 含 Next.js 构建标识 turbopack、并引用 /logo/logo.svg
+_DIFY_PROBES = (
+    ("/logo/logo.svg", lambda code, body, ctype: code == 200 and "svg" in (ctype or "").lower()),
+    ("/signin",        lambda code, body, ctype: "turbopack" in body or "/logo/logo.svg" in body),
+    ("/console",       lambda code, body, ctype: "turbopack" in body),
+)
+# Dify docker-compose 的核心服务名（用于 `docker ps` 判定，避免 80 端口争用干扰）
+_DIFY_CORE_SERVICES = ("api", "web", "worker", "nginx", "plugin_daemon", "sandbox", "ssrf_proxy")
 
-    历史 bug：曾用 check_tcp(80) 判断，只要 80 端口有服务监听就返回 True。
-    现实中 80 端口常被 Steam++ / IIS / Apache / Nginx 等程序占用，
-    导致 Dify 明明没启动却显示"运行中"。现改为内容指纹验证：
-    端口通 → 请求特征路径 → 响应体含 "dify" 才算真的在跑。
+
+def _dify_running_via_docker() -> bool | None:
+    """通过 docker ps 判断 Dify 容器是否在运行。
+
+    返回 True=在跑, False=没跑, None=无法判断(docker 未安装/守护未启动)。
+    当 Steam++ 等程序与 Dify 争用 80 端口时，端口内容指纹会失效，
+    而 docker 容器状态是唯一可靠信号，故优先采用。
+    """
+    try:
+        r = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}"],
+            capture_output=True, text=True, timeout=8,
+        )
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None  # docker 守护未启动等 → 交给端口探测兜底
+
+    running = set()
+    for line in r.stdout.splitlines():
+        name, _, status = line.partition("\t")
+        if "up" not in status.lower():
+            continue
+        name = name.strip().lower()
+        for svc in _DIFY_CORE_SERVICES:
+            if svc in name:
+                running.add(svc)
+    if {"web", "nginx"}.issubset(running):
+        return True
+    if "web" in running or "nginx" in running:
+        return True  # 至少门户/反代在跑，80 能提供 UI
+    return False  # 仅有 api/worker 等后台，未对外提供 Web UI
+
+
+def check_dify() -> dict:
+    """Dify 检测：优先用 Docker 容器状态，端口内容指纹作兜底。
+
+    历史 bug：
+      1) 曾用 check_tcp(80) → Steam++ 占 80 时误报"运行中"；
+      2) 改用 "dify" 字面量 → Dify 是 Next.js SPA，HTML 不含该串，永远判否；
+      3) 80 端口上 Dify 与 Steam++ 可同时监听，请求被随机分发，单次探测可能命中 Steam++。
+    现改为 Docker 优先：只要 Dify 容器在跑即判定运行中，与 80 端口是否被抢占无关；
+    docker 不可用时再回退到端口内容指纹。
     """
     base = _env_dify_base()
     m = re.match(r"https?://([^:/]+)(?::(\d+))?", base)
@@ -160,13 +210,25 @@ def check_dify() -> dict:
     else:
         port = 443 if base.startswith("https://") else 80
 
+    # 1) Docker 优先（端口争用时唯一可靠信号）
+    docker_state = _dify_running_via_docker()
+    if docker_state is True:
+        return {"ok": True, "detail": "运行中（Docker 容器已启动）"}
+    if docker_state is False:
+        return {"ok": False, "detail": "未启动（Docker 中无 Dify 容器在运行）"}
+
+    # 2) docker 不可用时回退到端口内容指纹
     if not check_tcp(host, port):
         return {"ok": False, "detail": f"未检测到服务（{host}:{port} 未开放）"}
 
-    for path in ("/", "/console", "/signin", "/apps"):
-        code, body = _http_probe(base + path)
-        if code >= 0 and "dify" in body.lower():
-            return {"ok": True, "detail": f"运行中（{base}{path}）"}
+    # 每个候选重试 3 次，克服双进程监听导致的请求随机分发
+    for path, is_dify in _DIFY_PROBES:
+        for _ in range(3):
+            code, body, ctype = _http_probe(base + path)
+            if code < 0:
+                continue
+            if is_dify(code, body, ctype):
+                return {"ok": True, "detail": f"运行中（{base}{path}）"}
 
     return {"ok": False,
             "detail": f"{host}:{port} 有服务监听，但响应不是 Dify（可能被其他程序占用）"}
