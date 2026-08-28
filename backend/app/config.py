@@ -45,10 +45,9 @@ DIFY_KEY_WF8 = os.environ.get("DIFY_KEY_WF8", "")          # 管理端考勤分�
 DIFY_TIMEOUT = float(os.environ.get("DIFY_TIMEOUT", "60"))
 
 # ---------- 种子数据 ----------
-ROSTER_XLSX = os.environ.get(
-    "ROSTER_XLSX",
-    r"***REMOVED***",
-)
+# 花名册 Excel 路径。默认留空：每个人的花名册在自己机器上，路径不该写进代码。
+# 需要导入时在 backend/.env 里设置 ROSTER_XLSX=<你的路径> 即可。
+ROSTER_XLSX = os.environ.get("ROSTER_XLSX", "")
 
 
 def _load_env_file() -> None:
