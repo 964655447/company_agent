@@ -68,7 +68,7 @@ def _reply_salary(user, db) -> str:
         return "还没有工资核算记录。到「工资核算」页面提交绩效达成情况即可生成。"
     r = rows[0]
     return (f"最新工资核算（工号 {r.id} {r.name}）：基本 {r.base_salary:.0f} + 绩效奖金 {r.performance_bonus:.0f} + "
-            f"津贴 {r.allowance:.0f} = 应发 {r.gross_salary:.0f} 元（评级 {r.performance_rating}）。")
+            f"津贴 {r.allowance:.0f} = 应发 {r.gross_salary:.0f} 元（绩效系数 {float(r.performance_rating or 0):.2f}）。")
 
 
 def _reply_assessment(user, db, params) -> str:

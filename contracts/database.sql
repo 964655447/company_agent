@@ -66,22 +66,27 @@ CREATE TABLE reimbursement (
 ) COMMENT='费用报销';
 
 -- ------------------------------------------------------------
--- salary 工资核算表（扁平快照，字段严格按用户指定 v2：
---   NO, ID, name, position, base_salary, performance_rating,
---   performance_bonus, allowance, gross_salary）
--- ID = 工号（登录账号），为每行主键；gross_salary = base_salary + performance_bonus + allowance
+-- employee_salary 员工薪资绩效表（扁平快照，字段严格按契约 v3：
+--   NO, ID(工号), name, position, base_salary(固定不变),
+--   performance_rating(绩效系数), performance_bonus(绩效奖金),
+--   allowance(补贴), gross_salary(应发合计)）
+-- ID = 工号（登录账号），为每行主键
+-- 绩效奖金公式：performance_bonus = MIN(base_salary * performance_rating, 10000)
+-- 应发合计：gross_salary = base_salary + performance_bonus + allowance
 -- ------------------------------------------------------------
-CREATE TABLE salary (
-  no                 INT           NOT NULL            COMMENT '序号（花名册序号）→ employees.no',
-  id                 BIGINT        NOT NULL PRIMARY KEY COMMENT '工号（ID，登录账号）→ employees.emp_id',
-  name               VARCHAR(32)   NOT NULL            COMMENT '姓名',
-  position           VARCHAR(64)   NOT NULL            COMMENT '岗位',
-  base_salary        DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '基本工资',
-  performance_rating VARCHAR(8)    NOT NULL DEFAULT 'C' COMMENT '绩效评级 S/A/B/C/D',
-  performance_bonus  DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '绩效奖金',
-  allowance          DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '津贴/补贴',
-  gross_salary       DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '应发工资 = 基本+绩效奖金+津贴'
-) COMMENT='工资核算表';
+CREATE TABLE employee_salary (
+  `no`                INT           NOT NULL            COMMENT '序号',
+  `id`                VARCHAR(10)   NOT NULL            COMMENT '员工工号',
+  `name`              VARCHAR(50)   NOT NULL            COMMENT '员工姓名',
+  `position`          VARCHAR(50)   NOT NULL            COMMENT '职位',
+  `base_salary`       DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '基本工资(固定不变)',
+  `performance_rating` DECIMAL(3,2)  NOT NULL            COMMENT '绩效系数，1.0对应奖金上限10000',
+  `performance_bonus` DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '绩效奖金 MIN(base_salary*performance_factor,10000)',
+  `allowance`          DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '补贴',
+  `gross_salary`      DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '应发合计 = base_salary + performance_bonus + allowance',
+  PRIMARY KEY (`ID`),
+  UNIQUE KEY `uk_no` (`NO`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='员工薪资绩效表';
 
 -- ------------------------------------------------------------
 -- assessment_log 进阶考核查询日志

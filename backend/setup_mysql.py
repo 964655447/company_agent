@@ -243,7 +243,7 @@ def seed_from_sql(conn):
 def _reset_all(conn):
     with conn.cursor() as cur:
         cur.execute("SET FOREIGN_KEY_CHECKS=0")
-        for t in ("assessment_log", "reimbursement", "attendance", "salary", "employees"):
+        for t in ("assessment_log", "reimbursement", "attendance", "employee_salary", "employees"):
             cur.execute(f"DELETE FROM {DB_NAME}.{t}")
             cur.execute(f"ALTER TABLE {DB_NAME}.{t} AUTO_INCREMENT=1")
         cur.execute("SET FOREIGN_KEY_CHECKS=1")
@@ -271,7 +271,7 @@ def main():
         elif SEED_ATTENDANCE:
             gen_attendance(conn)
         with conn.cursor() as cur:
-            for t in ("employees", "attendance", "reimbursement", "salary", "assessment_log"):
+            for t in ("employees", "attendance", "reimbursement", "employee_salary", "assessment_log"):
                 cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.{t}")
                 print(f"  表 {t}: {cur.fetchone()['c']} 行")
     finally:

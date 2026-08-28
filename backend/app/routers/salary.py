@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import BASE_SALARY_MAP, BASE_SALARY_DEFAULT, SUBSIDY_DEFAULT, PERFORMANCE_RATIO
+from ..config import BASE_SALARY_MAP, BASE_SALARY_DEFAULT, SUBSIDY_DEFAULT
 from ..database import get_db
 from ..dify_client import wf3_performance, wf5_analysis
 from ..models import Employee, Salary
@@ -13,18 +13,24 @@ from ..security import get_current_user, require_manager
 
 router = APIRouter(prefix="/api/salary", tags=["工资"])
 
+# 绩效奖金上限（元）
+PERF_BONUS_CAP = 10000.0
 
-def _rating(score: float) -> str:
-    """绩效分数 → 评级。"""
+
+def _score_to_factor(score: float) -> float:
+    """AI 绩效分数(0-100) → 绩效系数(DECIMAL 3,2)。
+    映射：90+→1.20, 80+→1.00, 70+→0.80, 60+→0.60, <60→0.40。
+    系数 1.0 对应奖金上限 PERF_BONUS_CAP。
+    """
     if score >= 90:
-        return "S"
+        return 1.20
     if score >= 80:
-        return "A"
+        return 1.00
     if score >= 70:
-        return "B"
+        return 0.80
     if score >= 60:
-        return "C"
-    return "D"
+        return 0.60
+    return 0.40
 
 
 class PerformanceIn(BaseModel):
@@ -45,20 +51,21 @@ async def submit_performance(body: PerformanceIn,
     )
     score = float(result.get("performance_score", 60))
     base_salary = float(BASE_SALARY_MAP.get(user.position, BASE_SALARY_DEFAULT))
-    perf_bonus = round(base_salary * PERFORMANCE_RATIO * score / 100, 2)
+    factor = _score_to_factor(score)
+    perf_bonus = round(min(base_salary * factor, PERF_BONUS_CAP), 2)
     allowance = SUBSIDY_DEFAULT
     gross = round(base_salary + perf_bonus + allowance, 2)
-    rating = _rating(score)
 
-    rec = db.scalar(select(Salary).where(Salary.id == user.emp_id))
+    rec = db.scalar(select(Salary).where(Salary.id == str(user.emp_id)))
     if rec:  # 重复提交 → 覆盖本人工资核算
         rec.no, rec.name, rec.position = user.no, user.name, user.position
-        rec.base_salary, rec.performance_rating = base_salary, rating
+        rec.base_salary = base_salary
+        rec.performance_rating = factor
         rec.performance_bonus, rec.allowance, rec.gross_salary = perf_bonus, allowance, gross
     else:
         rec = Salary(
-            id=user.emp_id, no=user.no, name=user.name, position=user.position,
-            base_salary=base_salary, performance_rating=rating,
+            id=str(user.emp_id), no=user.no, name=user.name, position=user.position,
+            base_salary=base_salary, performance_rating=factor,
             performance_bonus=perf_bonus, allowance=allowance, gross_salary=gross,
         )
         db.add(rec)
@@ -66,6 +73,7 @@ async def submit_performance(body: PerformanceIn,
     return {
         **rec.to_dict(),
         "performance_score": score,
+        "performance_factor": factor,
         "reasoning": result.get("reasoning", ""),
     }
 
@@ -80,22 +88,22 @@ def my_salary(user: Employee = Depends(get_current_user),
 
 
 class SalaryUpsert(BaseModel):
-    """管理者编辑工资核算（9 字段全量更新）。"""
+    """管理者编辑工资核算（9 字段全量更新，performance_rating 为系数）。"""
     no: int | None = None
     name: str | None = None
     position: str | None = None
     base_salary: float = 0
-    performance_rating: str = "C"
+    performance_rating: float = 1.0       # 绩效系数 (DECIMAL 3,2)
     performance_bonus: float = 0
     allowance: float = 0
     gross_salary: float = 0
 
 
 @router.put("/{emp_id}")
-async def upsert_salary(emp_id: int, body: SalaryUpsert,
+async def upsert_salary(emp_id: str, body: SalaryUpsert,
                         manager: Employee = Depends(require_manager),
                         db: Session = Depends(get_db)):
-    emp = db.scalar(select(Employee).where(Employee.emp_id == emp_id))
+    emp = db.scalar(select(Employee).where(Employee.emp_id == int(emp_id)))
     if not emp:
         return {"error": f"工号 {emp_id} 不存在"}
     rec = db.scalar(select(Salary).where(Salary.id == emp_id))

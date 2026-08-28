@@ -90,29 +90,33 @@ class Reimbursement(Base):
         }
 
 
-class Salary(Base):
-    __tablename__ = "salary"
+class EmployeeSalary(Base):
+    __tablename__ = "employee_salary"
 
-    no = Column(Integer, nullable=False)                       # 序号（花名册序号）
-    id = Column(BigInteger, primary_key=True)                 # 工号（= employees.emp_id）
-    name = Column(String(32), nullable=False)
-    position = Column(String(64), nullable=False)
-    base_salary = Column(Float, nullable=False, default=0)    # 基本工资
-    performance_rating = Column(String(8), nullable=False, default="C")  # S/A/B/C/D
-    performance_bonus = Column(Float, nullable=False, default=0)        # 绩效奖金
-    allowance = Column(Float, nullable=False, default=0)       # 津贴/补贴
-    gross_salary = Column(Float, nullable=False, default=0)   # 应发工资
+    no = Column(Integer, nullable=False)                                # 序号
+    id = Column(String(10), primary_key=True)                          # 工号（VARCHAR，登录账号）
+    name = Column(String(50), nullable=False)
+    position = Column(String(50), nullable=False)
+    base_salary = Column(Float, nullable=False, default=0)             # 基本工资（固定不变）
+    performance_rating = Column(Float, nullable=False, default=1.0)     # 绩效系数（DECIMAL 3,2），1.0 对应奖金上限
+    performance_bonus = Column(Float, nullable=False, default=0)         # 绩效奖金 = MIN(base * factor, 10000)
+    allowance = Column(Float, nullable=False, default=0)                # 补贴
+    gross_salary = Column(Float, nullable=False, default=0)             # 应发合计 = base + bonus + allowance
 
     def to_dict(self) -> dict:
         return {
             "no": self.no, "id": self.id, "name": self.name,
             "position": self.position,
             "base_salary": round(self.base_salary, 2),
-            "performance_rating": self.performance_rating,
+            "performance_rating": float(self.performance_rating or 0),
             "performance_bonus": round(self.performance_bonus, 2),
             "allowance": round(self.allowance, 2),
             "gross_salary": round(self.gross_salary, 2),
         }
+
+
+# 向后兼容别名：外部代码仍可用 Salary 引用
+Salary = EmployeeSalary
 
 
 class AssessmentLog(Base):

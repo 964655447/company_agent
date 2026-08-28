@@ -80,14 +80,15 @@ WHERE DAYOFWEEK(md.d) BETWEEN 2 AND 6
   AND (SELECT COUNT(*) FROM attendance) = 0;
 
 -- ------------------------------------------------------------
--- 3) salary 工资核算（按岗位算基本工资/绩效/津贴；字段严格 9 列）
---    gross_salary = base_salary + performance_bonus + allowance
+-- 3) employee_salary 员工薪资绩效（按岗位算基本工资/绩效系数/奖金/津贴）
+--    绩效奖金 = MIN(base_salary * performance_rating, 10000)
+--    应发合计 = base_salary + performance_bonus + allowance
 -- ------------------------------------------------------------
-INSERT INTO salary (no, id, name, position, base_salary, performance_rating, performance_bonus, allowance, gross_salary)
-SELECT no, emp_id, name, position, base, rating,
-       ROUND(base * CASE rating WHEN 'S' THEN 0.40 WHEN 'A' THEN 0.30 WHEN 'B' THEN 0.20 WHEN 'C' THEN 0.10 ELSE 0.0 END, 2) AS performance_bonus,
+INSERT INTO employee_salary (`no`, `id`, `name`, `position`, `base_salary`, `performance_rating`, `performance_bonus`, `allowance`, `gross_salary`)
+SELECT no, emp_id, name, position, base, factor,
+       ROUND(LEAST(base * factor, 10000), 2) AS performance_bonus,
        allow,
-       ROUND(base + base * CASE rating WHEN 'S' THEN 0.40 WHEN 'A' THEN 0.30 WHEN 'B' THEN 0.20 WHEN 'C' THEN 0.10 ELSE 0.0 END + allow, 2) AS gross_salary
+       ROUND(base + LEAST(base * factor, 10000) + allow, 2) AS gross_salary
 FROM (
   SELECT e.no, e.emp_id, e.name, e.position,
          CASE e.position
@@ -98,16 +99,16 @@ FROM (
            WHEN '财务经理' THEN 16000 WHEN '会计' THEN 9500
            ELSE 9000 END AS base,
          CASE e.position
-           WHEN '总经理' THEN 'S' WHEN '总经理助理' THEN 'A'
-           WHEN '商务经理' THEN 'A' WHEN '技术经理' THEN 'A'
-           WHEN '人事经理' THEN 'A' WHEN '财务经理' THEN 'A'
-           ELSE 'B' END AS rating,
+           WHEN '总经理' THEN 1.20 WHEN '总经理助理' THEN 1.00
+           WHEN '商务经理' THEN 1.00 WHEN '技术经理' THEN 1.00
+           WHEN '人事经理' THEN 1.00 WHEN '财务经理' THEN 1.00
+           ELSE 0.80 END AS factor,
          CASE e.department
            WHEN '总经办' THEN 1500 WHEN '商务部' THEN 800 WHEN '技术部' THEN 1000
            WHEN '人事部' THEN 700 WHEN '财务部' THEN 800 ELSE 800 END AS allow
   FROM employees e
 ) t
-WHERE (SELECT COUNT(*) FROM salary) = 0;
+WHERE (SELECT COUNT(*) FROM employee_salary) = 0;
 
 -- ------------------------------------------------------------
 -- 4) reimbursement 费用报销（姓名引用，缺失回退首条员工；已存在则跳过）
