@@ -20,7 +20,17 @@ import re
 import sys
 from pathlib import Path
 
-import pymysql
+try:
+    import pymysql
+except ImportError:
+    raise SystemExit(
+        "[依赖缺失] 当前 Python 环境未安装 pymysql。\n"
+        "请执行以下命令安装：\n"
+        "  pip install pymysql\n"
+        "或（如果用的是 Anaconda）：\n"
+        "  conda install pymysql -c conda-forge\n"
+        "安装后重新运行本脚本即可。"
+    )
 import random
 import json
 from datetime import date, datetime, timedelta
