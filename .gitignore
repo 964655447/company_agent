@@ -29,3 +29,6 @@ Thumbs.db
 
 # ===== WorkBuddy 项目数据（不入库）=====
 .workbuddy/
+
+# 本地数据库文件（不入库）
+*.db
