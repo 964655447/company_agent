@@ -1,0 +1,226 @@
+app:
+  description: |-
+    WF-8 管理端考勤分析。
+    输入统计周期（week/month）与可选部门，工作流调用后端 /api/attendance/wf-team-report
+    按员工聚合出周/月度考勤数据（出勤天数、迟到次数、平均到岗时间、最早最晚、缺勤天数、行为标签），
+    再由 LLM 生成面向管理者的员工行为分析与改进建议。
+    重要：所有数字均由后端聚合，LLM 只做解读与建议，不参与计算。
+  icon: "\U0001F4CA"
+  icon_background: '#534AB7'
+  mode: workflow
+  name: WF8-管理端考勤分析
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - data:
+          isInIteration: false
+          sourceType: start
+          targetType: http-request
+        id: edge-start-http
+        source: node_start
+        sourceHandle: source
+        target: node_http
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: http-request
+          targetType: llm
+        id: edge-http-llm
+        source: node_http
+        sourceHandle: source
+        target: node_llm
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: end
+        id: edge-llm-end
+        source: node_llm
+        sourceHandle: source
+        target: node_end
+        targetHandle: target
+        type: custom
+    nodes:
+      - data:
+          desc: 统计周期 / 部门 / 调用者工号
+          selected: false
+          title: 开始
+          type: start
+          variables:
+            - label: 统计周期
+              max_length: 16
+              options: []
+              required: false
+              type: text-input
+              variable: period
+            - label: 部门
+              max_length: 32
+              options: []
+              required: false
+              type: text-input
+              variable: dept
+            - label: 管理者工号
+              max_length: 16
+              options: []
+              required: false
+              type: text-input
+              variable: manager_id
+        id: node_start
+        position:
+          x: 80
+          y: 300
+        positionAbsolute:
+          x: 80
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 174
+      - data:
+          desc: 逐员工聚合周/月度考勤数据 + 行为标签
+          method: post
+          url: 'http://host.docker.internal:8000/api/attendance/wf-team-report'
+          authorization:
+            type: no-auth
+            config: null
+          headers: 'Content-Type: application/json'
+          params: ''
+          body:
+            type: json
+            data:
+              - key: ''
+                type: text
+                value: '{"period": "{{#node_start.period#}}", "dept": "{{#node_start.dept#}}", "manager_id": "{{#node_start.manager_id#}}", "top_n": 50}'
+          ssl_verify: true
+          timeout:
+            connect: null
+            read: null
+            write: null
+          selected: false
+          title: 按员工聚合
+          type: http-request
+          variables: []
+        id: node_http
+        position:
+          x: 380
+          y: 300
+        positionAbsolute:
+          x: 380
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 120
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: 基于真实数据生成员工行为分析与管理建议
+          memory:
+            window:
+              enabled: false
+              size: 10
+          model:
+            completion_params:
+              temperature: 0.6
+            mode: chat
+            name: qwen3.5:4b
+            provider: langgenius/ollama/ollama
+          prompt_template:
+            - id: wf8-sys
+              role: system
+              text: |-
+                你是公司的人力资源分析助手。后端已经按员工聚合好了周/月度考勤数据，返回结构化 JSON。
+                你的任务是基于这些真实数据，生成一份面向管理者的考勤与员工行为分析。
+
+                硬规则：
+                1. 只能使用 JSON 里的数据，严禁编造任何姓名、数字或比例。
+                2. 输出用 Markdown，严格按以下结构：
+                   ## 一、整体概况
+                   ## 二、需要关注的员工
+                   ## 三、表现突出的员工
+                   ## 四、管理建议
+                3. 「整体概况」引用 summary 中的 headcount、attendance_rate、late_rate、avg_days，并说明统计区间 range_start ~ range_end。
+                4. 「需要关注的员工」挑出迟到次数最多或出勤异常的人，逐个说明迟到次数、平均到岗时间，并给出具体可执行的改进建议（如调整通勤、弹性打卡、一对一沟通）。
+                5. 「表现突出的员工」点名全勤或零迟到的人，一句话肯定即可。
+                6. 某类数据为空时如实说明（如"本期无迟到记录"），不要硬凑内容。
+                7. 不要出现 JSON、字段名等原始技术内容。
+                8. 语气专业克制，只描述行为事实与给出建议，不做人格评价。
+            - id: wf8-user
+              role: user
+              text: |-
+                统计周期：{{#node_start.period#}}
+                部门：{{#node_start.dept#}}
+
+                后端返回的按员工聚合数据（JSON）：
+                {{#node_http.body#}}
+
+                请生成考勤与员工行为分析。
+          selected: false
+          title: 员工行为分析
+          type: llm
+          variables: []
+          vision:
+            enabled: false
+        id: node_llm
+        position:
+          x: 680
+          y: 300
+        positionAbsolute:
+          x: 680
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 120
+      - data:
+          desc: 输出分析报告
+          outputs:
+            - value_selector:
+                - node_llm
+                - text
+              variable: analysis
+          selected: false
+          title: 结束
+          type: end
+        id: node_end
+        position:
+          x: 980
+          y: 300
+        positionAbsolute:
+          x: 980
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 90

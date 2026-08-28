@@ -261,6 +261,58 @@ async def wf6_attendance_qa(question: str, emp: dict, stats: dict, user: str) ->
     return {"answer": wf6_fallback(question, emp, stats), "ai": False}
 
 
+# ============================================================
+# WF-7 员工考勤打卡（指令 → 打卡 → 判迟到 → 周/月统计 → 播报）
+# 职责边界：打卡写库、迟到判定、周月统计一律由后端 /api/attendance/wf-checkin
+# 完成（LLM 无法获知权威时间）；Dify 只做「指令理解」与「结果播报」。
+# ============================================================
+def wf7_fallback(command: str) -> str:
+    return (
+        f"已收到指令「{command}」。"   # 本地降级话术，具体数字由路由层补齐
+        "（当前为本地规则回复，接入 Dify WF-7 后由 AI 生成更自然的播报。）"
+    )
+
+
+async def wf7_checkin(command: str, emp_id: str, user: str) -> dict:
+    """调 WF-7。成功返回 {"answer":..., "ai": True}；
+    未接入/失败返回 ai=False，由路由层本地打卡并补齐统计话术。"""
+    try:
+        out = await run_workflow(
+            config.DIFY_KEY_WF7,
+            {"command": command, "emp_id": str(emp_id)},
+            user,
+        )
+        if out.get("answer"):
+            return {"answer": str(out["answer"]), "ai": True}
+    except DifyNotConfigured:
+        pass
+    except Exception:
+        pass
+    return {"answer": wf7_fallback(command), "ai": False}
+
+
+# ============================================================
+# WF-8 管理端考勤分析（按员工生成周/月数据 + 员工行为分析）
+# ============================================================
+async def wf8_team_report(period: str, dept: str | None, manager_id: int,
+                          user: str) -> str:
+    """调 WF-8 生成员工行为分析。未接入或失败时返回空串，
+    由路由层用 wf5_fallback 的模板分析兜底。"""
+    try:
+        out = await run_workflow(
+            config.DIFY_KEY_WF8,
+            {"period": period, "dept": dept or "", "manager_id": str(manager_id)},
+            user,
+        )
+        if out.get("analysis"):
+            return str(out["analysis"])
+    except DifyNotConfigured:
+        pass
+    except Exception:
+        pass
+    return ""
+
+
 def dify_status() -> dict:
     """给前端的 AI 接入状态展示。"""
     return {
@@ -268,4 +320,5 @@ def dify_status() -> dict:
         "wf1": bool(config.DIFY_KEY_WF1), "wf2": bool(config.DIFY_KEY_WF2),
         "wf3": bool(config.DIFY_KEY_WF3), "wf4": bool(config.DIFY_KEY_WF4),
         "wf5": bool(config.DIFY_KEY_WF5), "wf6": bool(config.DIFY_KEY_WF6),
+        "wf7": bool(config.DIFY_KEY_WF7), "wf8": bool(config.DIFY_KEY_WF8),
     }
