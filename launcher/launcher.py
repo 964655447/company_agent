@@ -86,23 +86,105 @@ def check_tcp(host: str, port: int, timeout: float = 1.5) -> bool:
         s.close()
 
 
-def check_http(url: str, timeout: float = 3.0) -> bool:
+def _http_probe(url: str, timeout: float = 3.0) -> tuple[int, str]:
+    """GET 请求，返回 (状态码, 响应体前 8KB)。连接失败返回 (-1, "")。
+
+    与旧的 check_http 不同：4xx/5xx 也带上响应体，便于做内容指纹判断。
+    """
     try:
-        req = urllib.request.Request(url, method="GET")
+        req = urllib.request.Request(url, method="GET",
+                                     headers={"User-Agent": "company-launcher"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.status < 500
+            return r.status, r.read(8192).decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, e.read(8192).decode("utf-8", "replace")
+        except Exception:
+            return e.code, ""
     except Exception:
-        return False
+        return -1, ""
+
+
+def check_http(url: str, timeout: float = 3.0) -> bool:
+    """仅判断能否拿到非 5xx 响应。
+
+    注意：这只说明"该地址有 HTTP 服务"，**不能**用来判断"是不是某个服务"。
+    要确认具体服务必须用内容指纹（见 check_dify / check_backend）。
+    """
+    code, _ = _http_probe(url, timeout)
+    return 0 <= code < 500
+
+
+def _env_dify_base() -> str:
+    """从 backend/.env 读 DIFY_BASE_URL（支持自定义端口），默认 http://localhost。"""
+    try:
+        if BACKEND_ENV.exists():
+            for line in BACKEND_ENV.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("DIFY_BASE_URL="):
+                    v = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    if v:
+                        return v.rstrip("/")
+    except Exception:
+        pass
+    return "http://localhost"
+
+
+def check_backend() -> dict:
+    """后端检测：必须命中我们自己的 /api/health，避免 8000 被别的程序占用时误报。"""
+    url = f"http://127.0.0.1:{BACKEND_PORT}/api/health"
+    if not check_tcp("127.0.0.1", BACKEND_PORT):
+        return {"ok": False, "detail": f"未启动（{BACKEND_PORT} 端口未开放）"}
+    code, body = _http_probe(url)
+    if code == 200 and "ok" in body.lower():
+        return {"ok": True, "detail": f"运行中（{BACKEND_PORT}）"}
+    if code >= 0:
+        return {"ok": False,
+                "detail": f"{BACKEND_PORT} 端口有服务，但 /api/health 异常（HTTP {code}）"}
+    return {"ok": False, "detail": f"后端无响应（{BACKEND_PORT}）"}
+
+
+def check_dify() -> dict:
+    """Dify 检测：必须验证响应内容确实是 Dify，不能只看端口是否开放。
+
+    历史 bug：曾用 check_tcp(80) 判断，只要 80 端口有服务监听就返回 True。
+    现实中 80 端口常被 Steam++ / IIS / Apache / Nginx 等程序占用，
+    导致 Dify 明明没启动却显示"运行中"。现改为内容指纹验证：
+    端口通 → 请求特征路径 → 响应体含 "dify" 才算真的在跑。
+    """
+    base = _env_dify_base()
+    m = re.match(r"https?://([^:/]+)(?::(\d+))?", base)
+    host = m.group(1) if m else "127.0.0.1"
+    if m and m.group(2):
+        port = int(m.group(2))
+    else:
+        port = 443 if base.startswith("https://") else 80
+
+    if not check_tcp(host, port):
+        return {"ok": False, "detail": f"未检测到服务（{host}:{port} 未开放）"}
+
+    for path in ("/", "/console", "/signin", "/apps"):
+        code, body = _http_probe(base + path)
+        if code >= 0 and "dify" in body.lower():
+            return {"ok": True, "detail": f"运行中（{base}{path}）"}
+
+    return {"ok": False,
+            "detail": f"{host}:{port} 有服务监听，但响应不是 Dify（可能被其他程序占用）"}
 
 
 def get_status() -> dict:
     mysql = check_tcp("127.0.0.1", 3306)
-    backend = check_http(f"http://127.0.0.1:{BACKEND_PORT}/api/health")
-    dify = check_tcp("127.0.0.1", 80) or check_http("http://localhost/")
+    backend = check_backend()
+    dify = check_dify()
     return {
         "mysql": mysql,
-        "backend": backend,
-        "dify": dify,
+        "backend": backend["ok"],
+        "dify": dify["ok"],
+        "detail": {
+            "mysql": "运行中（3306）" if mysql else "未启动（3306 端口未开放）",
+            "backend": backend["detail"],
+            "dify": dify["detail"],
+        },
         "ts": datetime.now().strftime("%H:%M:%S"),
     }
 
@@ -443,6 +525,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   .card .state { margin-top: 14px; font-size: 13px; font-weight: 600; }
   .card .state.on { color: #34d399; }
   .card .state.off { color: #f87171; }
+  .card .why { margin-top: 6px; color: #7f93b6; font-size: 11px; line-height: 1.5; word-break: break-all; min-height: 16px; }
   .card .btns { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
   button {
     cursor: pointer; border: none; border-radius: 10px; padding: 8px 12px;
@@ -489,6 +572,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="top"><span class="dot" id="dot-mysql"></span><span class="name">MySQL 数据库</span></div>
       <div class="meta">端口 3306 · 由系统服务管理</div>
       <div class="state" id="state-mysql">检测中…</div>
+      <div class="why" id="why-mysql"></div>
       <div class="btns"><button class="b-link" disabled>只读监控</button></div>
     </div>
 
@@ -496,6 +580,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="top"><span class="dot" id="dot-backend"></span><span class="name">后端 FastAPI</span></div>
       <div class="meta">端口 8000 · 可一键启停</div>
       <div class="state" id="state-backend">检测中…</div>
+      <div class="why" id="why-backend"></div>
       <div class="btns">
         <button class="b-start" id="btn-start">启动</button>
         <button class="b-stop" id="btn-stop">停止</button>
@@ -506,6 +591,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="top"><span class="dot" id="dot-dify"></span><span class="name">Dify 平台</span></div>
       <div class="meta">端口 80 · Docker 管理</div>
       <div class="state" id="state-dify">检测中…</div>
+      <div class="why" id="why-dify"></div>
       <div class="btns"><button class="b-open" id="btn-dify">打开控制台</button></div>
     </div>
   </div>
@@ -531,16 +617,21 @@ function toast(msg){
   t.textContent = msg; t.classList.add('show');
   clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 2600);
 }
-function setCard(key, on){
+function setCard(key, on, detail){
   document.getElementById('dot-'+key).className = 'dot ' + (on?'on':'off');
   const s = document.getElementById('state-'+key);
   s.className = 'state ' + (on?'on':'off');
   s.textContent = on ? '● 运行中' : '○ 已停止';
+  const w = document.getElementById('why-'+key);
+  if(w) w.textContent = detail || '';
 }
 async function refresh(){
   try{
     const r = await fetch('/api/status'); const d = await r.json();
-    setCard('mysql', d.mysql); setCard('backend', d.backend); setCard('dify', d.dify);
+    const dt = d.detail || {};
+    setCard('mysql', d.mysql, dt.mysql);
+    setCard('backend', d.backend, dt.backend);
+    setCard('dify', d.dify, dt.dify);
     document.getElementById('clock').textContent = '更新于 ' + d.ts;
   }catch(e){ toast('状态获取失败: '+e); }
 }
