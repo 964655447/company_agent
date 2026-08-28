@@ -217,100 +217,10 @@ async def wf5_analysis(report_type: str, period: str, stats: dict, user: str) ->
 
 
 # ============================================================
-# WF-6 考勤智能问答（悬浮气泡入口；fallback：模板回答）
+# 考勤类工作流（WF-6 考勤问答 / WF-7 员工打卡 / WF-8 管理端分析）
+# 已于 2026-08-28 撤销：对应 Dify 工作流已删除，相关接口改为纯本地实现
+# （见 routers/attendance.py 的 /ask、/command、/report）。
 # ============================================================
-def wf6_fallback(question: str, emp: dict, stats: dict) -> str:
-    period_cn = "本月" if stats.get("period") == "month" else "本周"
-    late = stats.get("late_count", 0)
-    days = stats.get("days", 0)
-    avg = stats.get("avg_clock_in", "")
-    parts = [
-        f"{emp.get('name', '')}{period_cn}已出勤 {days} 天",
-        f"迟到 {late} 次",
-        f"平均上班打卡时间 {avg}" if avg else "",
-    ]
-    if late == 0:
-        parts.append("出勤表现很好，请继续保持！")
-    elif late >= 3:
-        parts.append("迟到次数偏多，建议优化通勤安排哦。")
-    else:
-        parts.append("偶有迟到，注意按时到岗。")
-    return "，".join(p for p in parts if p) + "（本地规则回答，接入 Dify 后由 AI 生成更自然的分析）"
-
-
-async def wf6_attendance_qa(question: str, emp: dict, stats: dict, user: str) -> dict:
-    """考勤问答 v2。传入 question + emp_id 给 Dify，Dify 自己识别意图、查后端 API、生成回答。
-
-    降级策略：Dify 未配置/调用失败时走本地规则 wf6_fallback。
-    """
-    try:
-        out = await run_workflow(
-            config.DIFY_KEY_WF6,
-            {
-                "question": question,
-                "emp_id": str(user),   # 工号，Dify HTTP 节点用它调后端 /api/attendance/query
-            },
-            user,
-        )
-        if out.get("answer"):
-            return {"answer": str(out["answer"]), "ai": True}
-    except DifyNotConfigured:
-        pass
-    except Exception:
-        pass
-    return {"answer": wf6_fallback(question, emp, stats), "ai": False}
-
-
-# ============================================================
-# WF-7 员工考勤打卡（指令 → 打卡 → 判迟到 → 周/月统计 → 播报）
-# 职责边界：打卡写库、迟到判定、周月统计一律由后端 /api/attendance/wf-checkin
-# 完成（LLM 无法获知权威时间）；Dify 只做「指令理解」与「结果播报」。
-# ============================================================
-def wf7_fallback(command: str) -> str:
-    return (
-        f"已收到指令「{command}」。"   # 本地降级话术，具体数字由路由层补齐
-        "（当前为本地规则回复，接入 Dify WF-7 后由 AI 生成更自然的播报。）"
-    )
-
-
-async def wf7_checkin(command: str, emp_id: str, user: str) -> dict:
-    """调 WF-7。成功返回 {"answer":..., "ai": True}；
-    未接入/失败返回 ai=False，由路由层本地打卡并补齐统计话术。"""
-    try:
-        out = await run_workflow(
-            config.DIFY_KEY_WF7,
-            {"command": command, "emp_id": str(emp_id)},
-            user,
-        )
-        if out.get("answer"):
-            return {"answer": str(out["answer"]), "ai": True}
-    except DifyNotConfigured:
-        pass
-    except Exception:
-        pass
-    return {"answer": wf7_fallback(command), "ai": False}
-
-
-# ============================================================
-# WF-8 管理端考勤分析（按员工生成周/月数据 + 员工行为分析）
-# ============================================================
-async def wf8_team_report(period: str, dept: str | None, manager_id: int,
-                          user: str) -> str:
-    """调 WF-8 生成员工行为分析。未接入或失败时返回空串，
-    由路由层用 wf5_fallback 的模板分析兜底。"""
-    try:
-        out = await run_workflow(
-            config.DIFY_KEY_WF8,
-            {"period": period, "dept": dept or "", "manager_id": str(manager_id)},
-            user,
-        )
-        if out.get("analysis"):
-            return str(out["analysis"])
-    except DifyNotConfigured:
-        pass
-    except Exception:
-        pass
-    return ""
 
 
 def dify_status() -> dict:
@@ -319,6 +229,5 @@ def dify_status() -> dict:
         "base_url": bool(config.DIFY_BASE_URL),
         "wf1": bool(config.DIFY_KEY_WF1), "wf2": bool(config.DIFY_KEY_WF2),
         "wf3": bool(config.DIFY_KEY_WF3), "wf4": bool(config.DIFY_KEY_WF4),
-        "wf5": bool(config.DIFY_KEY_WF5), "wf6": bool(config.DIFY_KEY_WF6),
-        "wf7": bool(config.DIFY_KEY_WF7), "wf8": bool(config.DIFY_KEY_WF8),
+        "wf5": bool(config.DIFY_KEY_WF5),
     }

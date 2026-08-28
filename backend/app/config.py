@@ -30,18 +30,17 @@ BASE_SALARY_MAP = {
 }
 BASE_SALARY_DEFAULT = 6000
 
-# ---------- Dify 接入（AI 大脑）----------
+# ---------- Dify 接入（AI 大脑，仅 WF-1~WF-5）----------
 # 未配置时所有 AI 调用走本地 fallback 规则，系统照常可跑。
 # 各 Key 在 Dify 对应工作流的「访问 API」页面获取。
+# 注：考勤类工作流（原 WF-6 问答 / WF-7 打卡 / WF-8 分析）已于 2026-08-28 撤销，
+#     相关接口改为纯本地实现，不再需要对应 Key。
 DIFY_BASE_URL = os.environ.get("DIFY_BASE_URL", "")        # 例 http://localhost
 DIFY_KEY_WF1 = os.environ.get("DIFY_KEY_WF1", "")          # 身份意图识别
 DIFY_KEY_WF2 = os.environ.get("DIFY_KEY_WF2", "")          # 报销 OCR 抽取
 DIFY_KEY_WF3 = os.environ.get("DIFY_KEY_WF3", "")          # 绩效抽取与工资计算
 DIFY_KEY_WF4 = os.environ.get("DIFY_KEY_WF4", "")          # 岗位知识 RAG
 DIFY_KEY_WF5 = os.environ.get("DIFY_KEY_WF5", "")          # 分析报告生成
-DIFY_KEY_WF6 = os.environ.get("DIFY_KEY_WF6", "")          # 考勤智能问答（悬浮气泡）
-DIFY_KEY_WF7 = os.environ.get("DIFY_KEY_WF7", "")          # 员工考勤打卡（写卡+判迟到+周月统计）
-DIFY_KEY_WF8 = os.environ.get("DIFY_KEY_WF8", "")          # 管理端考勤分析（按人聚合+行为分析）
 DIFY_TIMEOUT = float(os.environ.get("DIFY_TIMEOUT", "60"))
 
 # ---------- 种子数据 ----------
@@ -66,7 +65,6 @@ def _load_env_file() -> None:
     # 重读一次让上面的默认值拿到 .env 内容
     global DB_URL, DIFY_BASE_URL, JWT_SECRET
     global DIFY_KEY_WF1, DIFY_KEY_WF2, DIFY_KEY_WF3, DIFY_KEY_WF4, DIFY_KEY_WF5
-    global DIFY_KEY_WF6, DIFY_KEY_WF7, DIFY_KEY_WF8
     if os.environ.get("DB_URL"):
         DB_URL = os.environ["DB_URL"]
     if os.environ.get("DIFY_BASE_URL"):
@@ -78,9 +76,6 @@ def _load_env_file() -> None:
     DIFY_KEY_WF3 = os.environ.get("DIFY_KEY_WF3", DIFY_KEY_WF3)
     DIFY_KEY_WF4 = os.environ.get("DIFY_KEY_WF4", DIFY_KEY_WF4)
     DIFY_KEY_WF5 = os.environ.get("DIFY_KEY_WF5", DIFY_KEY_WF5)
-    DIFY_KEY_WF6 = os.environ.get("DIFY_KEY_WF6", DIFY_KEY_WF6)
-    DIFY_KEY_WF7 = os.environ.get("DIFY_KEY_WF7", DIFY_KEY_WF7)
-    DIFY_KEY_WF8 = os.environ.get("DIFY_KEY_WF8", DIFY_KEY_WF8)
 
 
 _load_env_file()
