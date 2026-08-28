@@ -38,23 +38,44 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 # 运行启动器的 python 即用来跑后端；如需指定虚拟环境，可设环境变量 COMPANY_PYTHON
 def _resolve_python():
     """挑选一个能 import 后端依赖（uvicorn/sqlalchemy/pymysql/fastapi）的 python。
-    优先级：COMPANY_PYTHON 环境变量 > 启动器自身 python > backend 下的 venv > 回退系统 python。
+    优先级：COMPANY_PYTHON > 启动器自身 python > backend venv > 常见 Anaconda 安装 >
+            Windows py -3 启动器 > 回退系统 python（并打警告）。
+    关键：所有候选都不含依赖时，绝不能再悄悄回退到没依赖的 python，否则后端会秒崩。
     """
-    candidates = []
+    raw = []
     if os.environ.get("COMPANY_PYTHON"):
-        candidates.append(os.environ["COMPANY_PYTHON"])
-    candidates.append(sys.executable)
+        raw.append(os.environ["COMPANY_PYTHON"])
+    raw.append(sys.executable)
     for v in (BACKEND_DIR / "venv" / "Scripts" / "python.exe",
               BACKEND_DIR / ".venv" / "Scripts" / "python.exe",
               BACKEND_DIR / "venv" / "bin" / "python",
               BACKEND_DIR / ".venv" / "bin" / "python"):
         if v.exists():
-            candidates.append(str(v))
-    seen = []
+            raw.append(str(v))
+    # 常见 Anaconda / 发行版 Python（同事 clone 后若装了 Anaconda 也能自动识别）
+    for p in ("G:/Anaconda3/python.exe",
+              "C:/Users/96465/anaconda3/python.exe",
+              "C:/ProgramData/Anaconda3/python.exe",
+              "C:/Python313/python.exe", "C:/Python312/python.exe"):
+        if os.path.exists(p):
+            raw.append(p)
+    # Windows 自带的 py -3 启动器：解析成真实 exe 路径再加入候选
+    raw.append("py -3")
+
+    candidates = []
+    for c in raw:
+        if " " in c:  # "py -3" → 解析为真实可执行文件路径
+            try:
+                r = subprocess.run(c.split() + ["-c", "import sys; print(sys.executable)"],
+                                   capture_output=True, text=True, timeout=20)
+                if r.returncode == 0 and r.stdout.strip():
+                    candidates.append(r.stdout.strip())
+            except Exception:
+                pass
+        elif c not in candidates:
+            candidates.append(c)
+
     for c in candidates:
-        if c in seen:
-            continue
-        seen.append(c)
         try:
             r = subprocess.run(
                 [c, "-c", "import uvicorn, sqlalchemy, pymysql, fastapi"],
@@ -63,6 +84,10 @@ def _resolve_python():
                 return c
         except Exception:
             pass
+    # 全部失败：退回启动器自身 python，并在 stderr 打显眼警告（便于用户排查）
+    sys.stderr.write(
+        "\n[启动器] 警告：未找到带 uvicorn/sqlalchemy/pymysql/fastapi 的 Python，"
+        "后端可能无法启动。请安装依赖或用 COMPANY_PYTHON 指定正确的 python。\n")
     return sys.executable
 
 PYTHON = _resolve_python()
@@ -113,7 +138,7 @@ def check_http(url: str, timeout: float = 3.0) -> bool:
     注意：这只说明"该地址有 HTTP 服务"，**不能**用来判断"是不是某个服务"。
     要确认具体服务必须用内容指纹（见 check_dify / check_backend）。
     """
-    code, _ = _http_probe(url, timeout)
+    code, _, _ = _http_probe(url, timeout)
     return 0 <= code < 500
 
 
@@ -371,11 +396,13 @@ def start_backend() -> dict:
         if check_http(f"http://127.0.0.1:{BACKEND_PORT}/api/health"):
             return {"ok": True, "msg": "后端已在运行", "already": True}
         logf = open(LOG_FILE, "a", encoding="utf-8")
-        logf.write(f"\n[{datetime.now()}] === 启动后端 ===\n")
+        logf.write(f"\n[{datetime.now()}] === 启动后端 (python={PYTHON}) ===\n")
+        logf.flush()
+        import time
         try:
             backend_proc = subprocess.Popen(
                 [PYTHON, "-m", "uvicorn", "app.main:app",
-                 "--host", "0.0.0.0", "--port", str(BACKEND_PORT)],
+                 "--host", "127.0.0.1", "--port", str(BACKEND_PORT)],
                 cwd=BACKEND_DIR,
                 stdout=logf,
                 stderr=subprocess.STDOUT,
@@ -383,13 +410,23 @@ def start_backend() -> dict:
             )
         except Exception as e:
             return {"ok": False, "msg": f"启动失败: {e}"}
-        # 最多等 15 秒确认起来
-        for _ in range(30):
+        # 子进程 3 秒内异常退出 → uvicorn 启动失败（依赖缺失/端口占用等），立即报错而非干等
+        for _ in range(6):
+            if backend_proc.poll() is not None:
+                logf.flush()
+                tail = ""
+                try:
+                    with open(LOG_FILE, "r", encoding="utf-8") as f:
+                        tail = "".join(f.readlines()[-12:])
+                except Exception:
+                    pass
+                return {"ok": False,
+                        "msg": "后端启动失败（uvicorn 异常退出）：\n" + tail.strip()[-600:]}
             if check_http(f"http://127.0.0.1:{BACKEND_PORT}/api/health"):
                 return {"ok": True, "msg": "后端启动成功", "already": False}
-            import time
             time.sleep(0.5)
-        return {"ok": True, "msg": "已发出启动命令，仍在初始化…", "already": False}
+        # 进程还在但端口暂未就绪 → 大概率在加载，先返回，前端会持续刷新状态
+        return {"ok": True, "msg": "已发出启动命令，正在初始化（约数秒）…", "already": False}
 
 
 def stop_backend() -> dict:
@@ -878,11 +915,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/setup":
             self._handle_setup()
         elif path == "/api/start":
-            # 启动前先确保数据库已建（幂等；首次需先通过 /api/setup 配置 .env）
-            res = ensure_db()
-            if not res["ok"]:
-                self._send(200, json.dumps(res, ensure_ascii=False))
-                return
+            # 不再在此同步建库（避免阻塞用户点击）。建库在启动器启动时后台跑过一次，
+            # 正常 clone 后首次配置向导也会建库。这里只负责拉起后端。
             self._send(200, json.dumps(start_backend(), ensure_ascii=False))
         elif path == "/api/stop":
             self._send(200, json.dumps(stop_backend(), ensure_ascii=False))
@@ -916,6 +950,8 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 def main():
     os.makedirs(os.path.dirname(LOG_FILE) or ".", exist_ok=True)
+    # 后台校验/初始化数据库一次（幂等，不阻塞仪表盘）。DB 已存在则秒过。
+    threading.Thread(target=lambda: ensure_db(), daemon=True).start()
     httpd = Server(("0.0.0.0", DASHBOARD_PORT), Handler)
     url = f"http://localhost:{DASHBOARD_PORT}/"
     print(f"[启动器] 仪表盘已启动: {url}")
