@@ -61,9 +61,15 @@ def parse_db_url(url: str) -> dict:
     return dict(host=host, port=int(port or 3306), user=user, password=pwd, db=db)
 
 
-DB_URL = os.environ.get(
-    "DB_URL", "mysql+pymysql://root:***REMOVED***@127.0.0.1:3306/company_agent"
-)
+DB_URL = os.environ.get("DB_URL")
+if not DB_URL:
+    raise SystemExit(
+        "[配置错误] 未设置 DB_URL。\n"
+        "请在本文件同目录的 .env 中设置（可复制 .env.example）：\n"
+        "  DB_URL=mysql+pymysql://<用户>:<密码>@<主机>:<端口>/<库名>\n"
+        "例如：DB_URL=mysql+pymysql://root:你的密码@127.0.0.1:3306/company_agent\n"
+        "（首次启动启动器时也会在网页向导中填写并写入 .env，无需手动设）"
+    )
 MYSQL = parse_db_url(DB_URL)
 DB_NAME = MYSQL.pop("db")
 ROSTER_XLSX = os.environ.get("ROSTER_XLSX", "")

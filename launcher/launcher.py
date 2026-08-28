@@ -301,7 +301,7 @@ SETUP_HTML = """<!DOCTYPE html>
         <div><label>端口</label><input name="port" value="3306" required></div>
       </div>
       <label>用户名</label><input name="user" value="root" required>
-      <label>密码（你本机 MySQL 的 root 密码）</label><input name="pwd" type="password" placeholder="例如 ***REMOVED***" required>
+      <label>密码（你本机 MySQL 的 root 密码）</label><input name="pwd" type="password" placeholder="输入你本机 MySQL root 密码" required>
       <label>数据库名</label><input name="db" value="company_agent" required>
       <label>Dify API Key（可选，留空则 AI 问答不可用）</label><input name="dify" placeholder="app-xxxxxxxx">
       <button type="submit" id="btn">保存并初始化数据库</button>
