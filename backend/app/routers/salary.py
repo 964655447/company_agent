@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,6 +12,19 @@ from ..models import Employee, Salary
 from ..security import get_current_user, require_manager
 
 router = APIRouter(prefix="/api/salary", tags=["工资"])
+
+
+def _rating(score: float) -> str:
+    """绩效分数 → 评级。"""
+    if score >= 90:
+        return "S"
+    if score >= 80:
+        return "A"
+    if score >= 70:
+        return "B"
+    if score >= 60:
+        return "C"
+    return "D"
 
 
 class PerformanceIn(BaseModel):
@@ -31,29 +44,32 @@ async def submit_performance(body: PerformanceIn,
         body.achievements, str(user.emp_id),
     )
     score = float(result.get("performance_score", 60))
-    base = float(BASE_SALARY_MAP.get(user.position, BASE_SALARY_DEFAULT))
-    perf_base = base * PERFORMANCE_RATIO
-    performance = round(perf_base * score / 100, 2)
-    subsidy = SUBSIDY_DEFAULT
-    total = round(base + performance + subsidy, 2)
+    base_salary = float(BASE_SALARY_MAP.get(user.position, BASE_SALARY_DEFAULT))
+    perf_bonus = round(base_salary * PERFORMANCE_RATIO * score / 100, 2)
+    allowance = SUBSIDY_DEFAULT
+    gross = round(base_salary + perf_bonus + allowance, 2)
+    rating = _rating(score)
     period = f"{date.today():%Y-%m}"
 
     rec = db.scalar(select(Salary).where(
-        Salary.employee_id == user.id, Salary.period == period))
+        Salary.emp_id == user.emp_id, Salary.period == period))
     if rec:  # 同月重复提交 → 覆盖
-        rec.base, rec.performance, rec.subsidy, rec.total = base, performance, subsidy, total
-        rec.performance_input = body.achievements
+        rec.no, rec.emp_id, rec.name, rec.position = user.no, user.emp_id, user.name, user.position
+        rec.base_salary, rec.performance_rating = base_salary, rating
+        rec.performance_bonus, rec.allowance, rec.gross_salary = perf_bonus, allowance, gross
     else:
-        rec = Salary(employee_id=user.id, period=period, base=base,
-                     performance=performance, subsidy=subsidy, total=total,
-                     performance_input=body.achievements)
+        rec = Salary(
+            no=user.no, emp_id=user.emp_id, name=user.name, position=user.position,
+            base_salary=base_salary, performance_rating=rating,
+            performance_bonus=perf_bonus, allowance=allowance,
+            gross_salary=gross, period=period,
+        )
         db.add(rec)
     db.commit()
     return {
         **rec.to_dict(),
         "performance_score": score,
         "reasoning": result.get("reasoning", ""),
-        "name": user.name, "position": user.position,
     }
 
 
@@ -61,7 +77,7 @@ async def submit_performance(body: PerformanceIn,
 def my_salary(user: Employee = Depends(get_current_user),
               db: Session = Depends(get_db)):
     rows = db.scalars(select(Salary).where(
-        Salary.employee_id == user.id,
+        Salary.emp_id == user.emp_id,
     ).order_by(Salary.period.desc())).all()
     return {"records": [r.to_dict() for r in rows]}
 
@@ -72,13 +88,14 @@ async def salary_report(manager: Employee = Depends(require_manager),
     perms = set(manager.permission_list)
     emps = db.scalars(select(Employee)).all()
     if len(perms) >= 5:
-        visible = {e.id: e for e in emps}
+        visible = {e.emp_id: e for e in emps}
     else:
-        visible = {e.id: e for e in emps if e.position in perms or e.id == manager.id}
+        visible = {e.emp_id: e for e in emps
+                   if e.position in perms or e.emp_id == manager.emp_id}
     rows = db.scalars(select(Salary).where(
-        Salary.employee_id.in_(visible.keys()),
+        Salary.emp_id.in_(visible.keys()),
     ).order_by(Salary.period.desc())).all()
-    totals = [r.total for r in rows]
+    totals = [r.gross_salary for r in rows]
     stats = {
         "slip_count": len(rows),
         "total_payroll": sum(totals),
@@ -86,9 +103,7 @@ async def salary_report(manager: Employee = Depends(require_manager),
     }
     analysis = await wf5_analysis("salary", f"{date.today():%Y-%m}", stats, str(manager.emp_id))
     return {
-        "rows": [{**r.to_dict(), "employee_name": visible[r.employee_id].name if r.employee_id in visible else "",
-                  "position": visible[r.employee_id].position if r.employee_id in visible else ""}
-                 for r in rows],
+        "rows": [r.to_dict() for r in rows],
         "stats": stats,
         "analysis": analysis,
     }

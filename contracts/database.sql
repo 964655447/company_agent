@@ -1,8 +1,10 @@
 -- ============================================================
--- 公司管理智能体 · 数据库契约 v0.1
+-- 公司管理智能体 · 数据库契约 v0.2
 -- 基准：MySQL 8.0+，字符集 utf8mb4
 -- 规则：任何人改字段，必须先改本文件并发群评审，再改代码。
 --       禁止在代码里私自 ALTER TABLE 或使用契约外字段。
+-- 用法（同事 clone 后执行，自动建库建表）：
+--   python backend/setup_mysql.py
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS company_agent
@@ -64,21 +66,26 @@ CREATE TABLE reimbursement (
 ) COMMENT='费用报销';
 
 -- ------------------------------------------------------------
--- salary 工资条
+-- salary 工资核算表（扁平快照：NO/工号/姓名/岗位 直接内嵌，便于按月导出）
+-- 字段来源：用户指定 v2 结构（NO, ID, name, position, base_salary,
+--          performance_rating, performance_bonus, allowance, gross_salary）
+-- gross_salary = base_salary + performance_bonus + allowance （由应用层计算写入）
 -- ------------------------------------------------------------
 CREATE TABLE salary (
-  id                INT AUTO_INCREMENT PRIMARY KEY,
-  employee_id       INT           NOT NULL             COMMENT '员工id',
-  period            VARCHAR(7)    NOT NULL             COMMENT '所属月 YYYY-MM',
-  base              DECIMAL(10,2) NOT NULL DEFAULT 0   COMMENT '基本工资',
-  performance       DECIMAL(10,2) NOT NULL DEFAULT 0   COMMENT '绩效工资',
-  subsidy           DECIMAL(10,2) NOT NULL DEFAULT 0   COMMENT '补贴',
-  total             DECIMAL(10,2) NOT NULL DEFAULT 0   COMMENT '合计',
-  performance_input TEXT          NULL                 COMMENT '绩效达成原始输入',
-  generated_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_sal_emp FOREIGN KEY (employee_id) REFERENCES employees(id),
-  UNIQUE KEY uk_sal_emp_period (employee_id, period)
-) COMMENT='工资条';
+  id                 INT AUTO_INCREMENT PRIMARY KEY,
+  no                 INT           NOT NULL            COMMENT '花名册序号 → employees.no',
+  emp_id             BIGINT        NOT NULL            COMMENT '工号（登录账号） → employees.emp_id',
+  name               VARCHAR(32)   NOT NULL            COMMENT '姓名',
+  position           VARCHAR(64)   NOT NULL            COMMENT '岗位',
+  base_salary        DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '基本工资',
+  performance_rating VARCHAR(8)    NOT NULL DEFAULT 'C' COMMENT '绩效评级 S/A/B/C/D',
+  performance_bonus  DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '绩效奖金',
+  allowance          DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '津贴/补贴',
+  gross_salary       DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '应发工资 = 基本+绩效奖金+津贴',
+  period             VARCHAR(7)    NOT NULL DEFAULT '' COMMENT '所属月 YYYY-MM（留空表示最新核算）',
+  created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_sal_emp_period (emp_id, period)
+) COMMENT='工资核算表';
 
 -- ------------------------------------------------------------
 -- assessment_log 进阶考核查询日志
