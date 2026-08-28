@@ -15,7 +15,7 @@ USE company_agent;
 -- employees 花名册（身份与权限的根表）
 -- 数据来源：花名册.xlsx（26人），上线前密码必须重置为哈希值
 -- ------------------------------------------------------------
-CREATE TABLE employees (
+CREATE TABLE IF NOT EXISTS employees (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   no            INT          NOT NULL UNIQUE        COMMENT '花名册序号',
   emp_id        BIGINT       NOT NULL UNIQUE        COMMENT '工号，登录账号，如 220401',
@@ -33,7 +33,7 @@ CREATE TABLE employees (
 -- ------------------------------------------------------------
 -- attendance 考勤
 -- ------------------------------------------------------------
-CREATE TABLE attendance (
+CREATE TABLE IF NOT EXISTS attendance (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   employee_id  INT      NOT NULL                     COMMENT '员工id → employees.id',
   checkin_time DATETIME NOT NULL                     COMMENT '打卡时间',
@@ -49,7 +49,7 @@ CREATE TABLE attendance (
 -- reimbursement 费用报销（含审批状态机）
 -- 状态流：draft → submitted → approving → approved / rejected
 -- ------------------------------------------------------------
-CREATE TABLE reimbursement (
+CREATE TABLE IF NOT EXISTS reimbursement (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   employee_id  INT           NOT NULL                 COMMENT '申请人 → employees.id',
   category     VARCHAR(64)   NOT NULL                 COMMENT '报销类目',
@@ -74,7 +74,7 @@ CREATE TABLE reimbursement (
 -- 绩效奖金公式：performance_bonus = MIN(base_salary * performance_rating, 10000)
 -- 应发合计：gross_salary = base_salary + performance_bonus + allowance
 -- ------------------------------------------------------------
-CREATE TABLE employee_salary (
+CREATE TABLE IF NOT EXISTS employee_salary (
   `no`                INT           NOT NULL            COMMENT '序号',
   `id`                VARCHAR(10)   NOT NULL            COMMENT '员工工号',
   `name`              VARCHAR(50)   NOT NULL            COMMENT '员工姓名',
@@ -91,7 +91,7 @@ CREATE TABLE employee_salary (
 -- ------------------------------------------------------------
 -- assessment_log 进阶考核查询日志
 -- ------------------------------------------------------------
-CREATE TABLE assessment_log (
+CREATE TABLE IF NOT EXISTS assessment_log (
   id               INT AUTO_INCREMENT PRIMARY KEY,
   employee_id      INT         NOT NULL               COMMENT '员工id',
   position_queried VARCHAR(64) NOT NULL               COMMENT '查询的岗位',

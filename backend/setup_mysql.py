@@ -81,26 +81,40 @@ def connect(**kw):
 
 
 def run_schema(conn):
-    with conn.cursor() as cur:
-        cur.execute("SHOW TABLES")
-        if cur.fetchall():
-            print(f"[schema] 库 {DB_NAME} 已有表，跳过 DDL"
-                  f"（如需重建请先 DROP DATABASE {DB_NAME} 再重跑）")
-            return
+    """执行 database.sql 中的所有 DDL 语句。
+
+    每条 CREATE TABLE 均带 IF NOT EXISTS，已存在的表自动跳过；
+    缺失的表会被创建。因此无论库处于什么状态（空/部分建表/完整），
+    调用本函数后都能保证 5 张表全部存在。
+    """
     sql = SQL_PATH.read_text(encoding="utf-8")
     stmts, buf = [], ""
     for line in sql.splitlines():
-        if line.strip().startswith("--"):   # 跳过注释行
+        if line.strip().startswith("--"):
             continue
         buf += line + "\n"
-        if line.strip().endswith(";"):       # 以分号结尾才算一条完整语句
+        if line.strip().endswith(";"):
             stmts.append(buf.strip())
             buf = ""
+    created, skipped, errors = 0, 0, []
     with conn.cursor() as cur:
         for s in stmts:
-            cur.execute(s)
+            try:
+                cur.execute(s)
+                created += 1
+            except pymysql.err.OperationalError as e:
+                # IF NOT EXISTS 已覆盖大部分情况；这里兜底捕获并记录
+                if e.args[0] == 1050:  # "Table already exists"
+                    skipped += 1
+                else:
+                    errors.append(str(e))
     conn.commit()
-    print(f"[schema] 已执行 {len(stmts)} 条 DDL（库 {DB_NAME} + 5 张表）")
+    msg = f"[schema] DDL 执行完毕：{created} 条成功"
+    if skipped:
+        msg += f"，{skipped} 条跳过（已存在）"
+    if errors:
+        msg += f"，{len(errors)} 条异常：{'; '.join(errors[:3])}"
+    print(msg)
 
 
 def ensure_database(conn=None):

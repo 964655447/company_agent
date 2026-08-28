@@ -345,7 +345,7 @@ SETUP_HTML = """<!DOCTYPE html>
         <div><label>端口</label><input name="port" value="3306" required></div>
       </div>
       <label>用户名</label><input name="user" value="root" required>
-      <label>密码（你本机 MySQL 的 root 密码）</label><input name="pwd" type="password" placeholder="输入你本机 MySQL root 密码" required>
+      <label>MySQL 密码</label><input name="pwd" type="password" placeholder="输入 MySQL root 密码" required>
       <label>数据库名</label><input name="db" value="company_agent" required>
       <label>Dify API Key（可选，留空则 AI 问答不可用）</label><input name="dify" placeholder="app-xxxxxxxx">
       <button type="submit" id="btn">保存并初始化数据库</button>
@@ -363,10 +363,32 @@ function toast(msg){
   t.textContent = msg; t.classList.add('show');
   clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 4000);
 }
+// 页面加载时：若已有 .env，回填当前配置（密码显示为掩码点）
+(async ()=>{
+  try {
+    const r = await fetch('/api/setup-config');
+    const d = await r.json();
+    if(d.ok && d.host){
+      document.querySelector('[name="host"]').value = d.host||'';
+      document.querySelector('[name="port"]').value = d.port||'';
+      document.querySelector('[name="user"]').value = d.user||'';
+      if(d.pwd_masked) document.querySelector('[name="pwd"]').value = d.pwd_masked;
+      document.querySelector('[name="db"]').value = d.db||'';
+      document.querySelector('[name="dify"]').value = d.dify||'';
+      // 密码框获焦时清空掩码，让用户重新输入
+      const pwdInput = document.querySelector('[name="pwd"]');
+      pwdInput.addEventListener('focus', function(){
+        if(this.value === '******') this.value = '';
+      });
+    }
+  }catch(e){/* 首次无 .env 时接口返回 {"ok":false}，静默忽略 */}
+})();
 document.getElementById('f').onsubmit = async (e)=>{
   e.preventDefault();
   const btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = '正在初始化…';
   const fd = new FormData(e.target);
+  // 密码框值为 ******（掩码回填）时，视为未修改，清空让后端用旧值合并
+  if(fd.get('pwd') === '******') fd.set('pwd', '');
   const body = new URLSearchParams(fd).toString();
   try{
     const r = await fetch('/api/setup', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body});
@@ -644,6 +666,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path == "/setup":
             # 常驻配置页：无论是否已配置，都可直接访问（用于首次配置或修改密码）
             self._send(200, SETUP_HTML, "text/html; charset=utf-8")
+        elif path == "/api/setup-config":
+            # 返回当前 .env 配置（密码脱敏为 ******），供 /setup 页面回填表单
+            if BACKEND_ENV.exists():
+                cur = _parse_db_url("")
+                existing = {}
+                for line in BACKEND_ENV.read_text(encoding="utf-8").splitlines():
+                    if "=" in line and not line.strip().startswith("#"):
+                        k, v = line.split("=", 1)
+                        existing[k.strip()] = v.strip()
+                db_info = _parse_db_url(existing.get("DB_URL", ""))
+                self._send(200, json.dumps({
+                    "ok": True,
+                    "host": db_info.get("host", ""),
+                    "port": db_info.get("port", ""),
+                    "user": db_info.get("user", ""),
+                    "pwd_masked": "******" if db_info.get("pwd") else "",
+                    "db": db_info.get("db", ""),
+                    "dify": existing.get("DIFY_KEY_WF6", ""),
+                }, ensure_ascii=False))
+            else:
+                self._send(200, json.dumps({"ok": False}, ensure_ascii=False))
         elif path == "/api/status":
             self._send(200, json.dumps(get_status(), ensure_ascii=False))
         elif path.startswith("/fe/"):
