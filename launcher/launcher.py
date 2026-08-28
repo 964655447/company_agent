@@ -23,15 +23,50 @@ import sys
 import socket
 import urllib.request
 import urllib.error
+import urllib.parse
 from datetime import datetime
+from pathlib import Path
 
-# ============================ 配置 ============================
+# ============================ 配置（全部相对定位，克隆到任意路径都能用）============================
 BACKEND_PORT = 8000
 DASHBOARD_PORT = 9000
-PYTHON = r"***REMOVED***"
-BACKEND_DIR = r"***REMOVED***\backend"
-FRONTEND_DIR = r"***REMOVED***\frontend"
-LOG_FILE = os.path.join(BACKEND_DIR, "launcher_backend.log")
+LAUNCHER_DIR = Path(__file__).resolve().parent
+ROOT_DIR = LAUNCHER_DIR.parent
+BACKEND_DIR = ROOT_DIR / "backend"
+FRONTEND_DIR = ROOT_DIR / "frontend"
+# 运行启动器的 python 即用来跑后端；如需指定虚拟环境，可设环境变量 COMPANY_PYTHON
+def _resolve_python():
+    """挑选一个能 import 后端依赖（uvicorn/sqlalchemy/pymysql/fastapi）的 python。
+    优先级：COMPANY_PYTHON 环境变量 > 启动器自身 python > backend 下的 venv > 回退系统 python。
+    """
+    candidates = []
+    if os.environ.get("COMPANY_PYTHON"):
+        candidates.append(os.environ["COMPANY_PYTHON"])
+    candidates.append(sys.executable)
+    for v in (BACKEND_DIR / "venv" / "Scripts" / "python.exe",
+              BACKEND_DIR / ".venv" / "Scripts" / "python.exe",
+              BACKEND_DIR / "venv" / "bin" / "python",
+              BACKEND_DIR / ".venv" / "bin" / "python"):
+        if v.exists():
+            candidates.append(str(v))
+    seen = []
+    for c in candidates:
+        if c in seen:
+            continue
+        seen.append(c)
+        try:
+            r = subprocess.run(
+                [c, "-c", "import uvicorn, sqlalchemy, pymysql, fastapi"],
+                capture_output=True, text=True, timeout=20)
+            if r.returncode == 0:
+                return c
+        except Exception:
+            pass
+    return sys.executable
+
+PYTHON = _resolve_python()
+BACKEND_ENV = BACKEND_DIR / ".env"
+LOG_FILE = BACKEND_DIR / "launcher_backend.log"
 
 backend_proc = None
 backend_lock = threading.Lock()
@@ -69,6 +104,75 @@ def get_status() -> dict:
         "dify": dify,
         "ts": datetime.now().strftime("%H:%M:%S"),
     }
+
+
+# ============================ 数据库一键初始化 ============================
+def ensure_db() -> dict:
+    """若 backend/.env 已存在，则自动建库建表（幂等）。返回结果 dict。"""
+    if not BACKEND_ENV.exists():
+        return {"ok": False, "msg": "尚未配置数据库，请先在本页填写 MySQL 信息"}
+    try:
+        r = subprocess.run(
+            [PYTHON, "setup_mysql.py"],
+            cwd=str(BACKEND_DIR),
+            capture_output=True, text=True, timeout=90,
+        )
+        if r.returncode == 0:
+            return {"ok": True, "msg": "数据库已创建/校验完成（建库 + 5 张表）"}
+        err = (r.stderr or r.stdout or "").strip().splitlines()[-3:]
+        return {"ok": False, "msg": "建库失败：\n" + "\n".join(err)}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "msg": "建库超时（请确认 MySQL 服务已启动）"}
+    except Exception as e:
+        return {"ok": False, "msg": f"建库异常：{e}"}
+
+
+def seed_db() -> dict:
+    """执行 contracts/seed.sql 灌入演示数据（幂等，已非空表跳过）。返回结果 dict。"""
+    if not BACKEND_ENV.exists():
+        return {"ok": False, "msg": "尚未配置数据库，请先在「首次配置」填写 MySQL 信息"}
+    try:
+        r = subprocess.run(
+            [PYTHON, "setup_mysql.py", "--seed-demo"],
+            cwd=str(BACKEND_DIR),
+            capture_output=True, text=True, timeout=120,
+        )
+        if r.returncode == 0:
+            return {"ok": True, "msg": "演示数据已生成（已存在的表会自动跳过）"}
+        err = (r.stderr or r.stdout or "").strip().splitlines()[-5:]
+        return {"ok": False, "msg": "生成失败：\n" + "\n".join(err)}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "msg": "生成超时（数据量较大，请稍后重试）"}
+    except Exception as e:
+        return {"ok": False, "msg": f"生成异常：{e}"}
+
+
+def write_env_from_form(form: dict) -> str:
+    """根据表单生成 backend/.env（基于 .env.example 模板，替换 DB_URL 与 DIFY_KEY_WF6）。"""
+    host = (form.get("host") or "127.0.0.1").strip()
+    port = (form.get("port") or "3306").strip()
+    user = (form.get("user") or "root").strip()
+    pwd = (form.get("pwd") or "").strip()
+    db = (form.get("db") or "company_agent").strip()
+    dify = (form.get("dify") or "").strip()
+    db_url = f"mysql+pymysql://{user}:{pwd}@{host}:{port}/{db}"
+    tpl_path = ROOT_DIR / ".env.example"
+    tpl = tpl_path.read_text(encoding="utf-8") if tpl_path.exists() else ""
+    out = []
+    for line in tpl.splitlines():
+        if line.startswith("DB_URL="):
+            out.append(f"DB_URL={db_url}")
+        elif line.startswith("DIFY_KEY_WF6="):
+            out.append(f"DIFY_KEY_WF6={dify}")
+        else:
+            out.append(line)
+    # 若模板里没有这两个 key（兜底），手动补
+    if not any(l.startswith("DB_URL=") for l in out):
+        out.append(f"DB_URL={db_url}")
+    if not any(l.startswith("DIFY_KEY_WF6=") for l in out):
+        out.append(f"DIFY_KEY_WF6={dify}")
+    BACKEND_ENV.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+    return db_url
 
 
 # ============================ 后端启停 ============================
@@ -137,6 +241,99 @@ def stop_backend() -> dict:
         if not stopped:
             return {"ok": True, "msg": "后端未运行，无需停止"}
         return {"ok": True, "msg": f"已停止: {', '.join(stopped)}"}
+
+
+# ============================ 首次配置向导 HTML ============================
+SETUP_HTML = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公司管理智能体 · 首次配置</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: radial-gradient(1200px 600px at 70% -10%, #1b2b4a 0%, #0b1020 55%, #070a14 100%);
+    color: #e6ecf5; min-height: 100vh; padding: 36px 18px;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; }
+  .sub { color: #8aa0c4; font-size: 13px; margin: 6px 0 22px; }
+  .card {
+    background: rgba(20,28,48,.72); border: 1px solid rgba(120,150,210,.16);
+    border-radius: 16px; padding: 22px; backdrop-filter: blur(8px);
+  }
+  label { display: block; font-size: 13px; color: #b9c8e6; margin: 14px 0 6px; }
+  input {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(120,150,210,.25);
+    background: rgba(10,16,32,.6); color: #e6ecf5; font-size: 14px; font-family: inherit;
+  }
+  input:focus { outline: none; border-color: #4f8cff; }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  button {
+    margin-top: 22px; width: 100%; cursor: pointer; border: none; border-radius: 10px;
+    padding: 12px; font-size: 15px; font-weight: 700; color: #fff;
+    background: linear-gradient(135deg,#22c55e,#16a34a); transition: .15s; font-family: inherit;
+  }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .note { margin-top: 16px; font-size: 12px; color: #7f93b6; line-height: 1.7; }
+  .note code { background: rgba(120,150,210,.14); padding: 1px 6px; border-radius: 5px; color: #cfe0ff; }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+    background: #111a30; border: 1px solid rgba(120,150,210,.25); color: #dfe8f7;
+    padding: 10px 18px; border-radius: 12px; font-size: 13px; opacity: 0; transition: .25s;
+    pointer-events: none; white-space: pre-line; max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>公司管理智能体 · 首次配置</h1>
+  <div class="sub">检测到尚未配置数据库，请填写你本机 MySQL 信息，启动器将自动建库建表。</div>
+  <div class="card">
+    <form id="f">
+      <div class="row">
+        <div><label>MySQL 主机</label><input name="host" value="127.0.0.1" required></div>
+        <div><label>端口</label><input name="port" value="3306" required></div>
+      </div>
+      <label>用户名</label><input name="user" value="root" required>
+      <label>密码（你本机 MySQL 的 root 密码）</label><input name="pwd" type="password" placeholder="例如 ***REMOVED***" required>
+      <label>数据库名</label><input name="db" value="company_agent" required>
+      <label>Dify API Key（可选，留空则 AI 问答不可用）</label><input name="dify" placeholder="app-xxxxxxxx">
+      <button type="submit" id="btn">保存并初始化数据库</button>
+    </form>
+    <div class="note">
+      前提：你本机已安装并启动了 <code>MySQL 8.0+</code>。没有的话先安装 MySQL 并记住 root 密码。<br>
+      提交后启动器会执行 <code>CREATE DATABASE</code> + 建 5 张表，然后回到控制台一键启动前后端。
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 4000);
+}
+document.getElementById('f').onsubmit = async (e)=>{
+  e.preventDefault();
+  const btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = '正在初始化…';
+  const fd = new FormData(e.target);
+  const body = new URLSearchParams(fd).toString();
+  try{
+    const r = await fetch('/api/setup', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body});
+    const d = await r.json();
+    if(d.ok){ toast('数据库已就绪，正在进入控制台…'); setTimeout(()=>location.reload(), 1200); }
+    else { toast(d.msg); btn.disabled = false; btn.textContent = '保存并初始化数据库'; }
+  }catch(err){ toast('请求失败: '+err); btn.disabled = false; btn.textContent = '保存并初始化数据库'; }
+};
+</script>
+</body>
+</html>"""
 
 
 # ============================ 仪表盘 HTML ============================
@@ -251,6 +448,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div class="label">快捷入口</div>
     <button class="b-open" id="btn-fe">打开前端页面</button>
     <button class="b-link" id="btn-docs">后端 API 文档</button>
+    <button class="b-link" id="btn-seed">生成演示数据</button>
     <button class="b-link" id="btn-refresh">立即刷新状态</button>
   </div>
 
@@ -291,6 +489,14 @@ document.getElementById('btn-stop').onclick = async ()=>{
 document.getElementById('btn-dify').onclick = ()=> window.open('http://localhost/console','_blank');
 document.getElementById('btn-fe').onclick = ()=> window.open(DASH + '/fe/index.html','_blank');
 document.getElementById('btn-docs').onclick = ()=> window.open('http://localhost:8000/docs','_blank');
+document.getElementById('btn-seed').onclick = async ()=>{
+  toast('正在生成演示数据…');
+  try{
+    const r = await fetch('/api/seed',{method:'POST'}); const d = await r.json();
+    toast(d.msg);
+  }catch(e){ toast('生成失败: '+e); }
+  refresh();
+};
 document.getElementById('btn-refresh').onclick = refresh;
 
 refresh(); setInterval(refresh, 3000);
@@ -384,7 +590,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
-            self._send(200, DASHBOARD_HTML, "text/html; charset=utf-8")
+            # 尚未配置数据库 → 首次配置向导；否则显示控制台
+            if not BACKEND_ENV.exists():
+                self._send(200, SETUP_HTML, "text/html; charset=utf-8")
+            else:
+                self._send(200, DASHBOARD_HTML, "text/html; charset=utf-8")
         elif path == "/api/status":
             self._send(200, json.dumps(get_status(), ensure_ascii=False))
         elif path.startswith("/fe/"):
@@ -406,12 +616,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
         else:
             self._send(404, "Not Found")
 
+    def _handle_setup(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length).decode("utf-8")
+            form = {k: v[0] for k, v in urllib.parse.parse_qs(raw).items()}
+            write_env_from_form(form)
+            res = ensure_db()
+            self._send(200, json.dumps(res, ensure_ascii=False))
+        except Exception as e:
+            self._send(200, json.dumps(
+                {"ok": False, "msg": f"配置写入失败：{e}"}, ensure_ascii=False))
+
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path == "/api/start":
+        if path == "/api/setup":
+            self._handle_setup()
+        elif path == "/api/start":
+            # 启动前先确保数据库已建（幂等；首次需先通过 /api/setup 配置 .env）
+            res = ensure_db()
+            if not res["ok"]:
+                self._send(200, json.dumps(res, ensure_ascii=False))
+                return
             self._send(200, json.dumps(start_backend(), ensure_ascii=False))
         elif path == "/api/stop":
             self._send(200, json.dumps(stop_backend(), ensure_ascii=False))
+        elif path == "/api/seed":
+            self._send(200, json.dumps(seed_db(), ensure_ascii=False))
         elif path.startswith("/api/"):
             # 反向代理到后端 8000
             self._proxy("POST")

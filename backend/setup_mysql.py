@@ -1,17 +1,19 @@
 """一次性初始化本地 MySQL：建库建表（schema 来自 ../contracts/database.sql）。
 
-同事 clone 仓库后的标准流程：
+同事 clone 仓库后的标准流程（也可由启动器 launcher 自动调用，无需手动跑）：
   1. cd backend
-  2. cp ../.env.example .env        （按需填写 DB_URL；花名册路径可选）
+  2. cp ../.env.example .env        （或首次启动启动器时网页填写数据库信息）
   3. pip install -r requirements.txt
-  4. python setup_mysql.py                     # 仅建库 + 5 张表
-  5.（可选）python setup_mysql.py --seed-employees   # 需本机有花名册.xlsx
+  4. python setup_mysql.py                     # 自动建库 + 5 张表（幂等，可重复跑）
+  5.（可选）python setup_mysql.py --seed-demo         # 执行 contracts/seed.sql 灌入演示数据（幂等，已非空表跳过）
+                                                  # 加 --reset 则先清空 5 张表再重灌
+  6.（可选）python setup_mysql.py --seed-employees   # 需本机有花名册.xlsx
                                                   # 再设环境变量 SEED_ATTENDANCE=1 可生成演示考勤
 
 注意：
   - 本文件只负责「结构」。员工/考勤等数据由各人自己的花名册.xlsx 灌入，不随仓库分发。
-  - 若库里已存在任何表，run_schema 会跳过 DDL（防止覆盖你已有的数据）。
-    要在本地启用新结构，请先 `DROP DATABASE company_agent;` 再重跑本脚本。
+  - ensure_database() 会 CREATE DATABASE IF NOT EXISTS 并建表；表已存在则跳过 DDL（不覆盖数据）。
+    要在本地启用新结构（如工资表 v2），请执行 contracts/migrate_salary_v2.sql。
 """
 import os
 import re
@@ -19,6 +21,9 @@ import sys
 from pathlib import Path
 
 import pymysql
+import random
+import json
+from datetime import date, datetime, timedelta
 
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
@@ -90,6 +95,33 @@ def run_schema(conn):
             cur.execute(s)
     conn.commit()
     print(f"[schema] 已执行 {len(stmts)} 条 DDL（库 {DB_NAME} + 5 张表）")
+
+
+def ensure_database(conn=None):
+    """确保数据库与表存在（幂等）。返回结果 dict。
+
+    - 库不存在则 CREATE DATABASE IF NOT EXISTS；
+    - 已存在则跳过建库；
+    - 进入库后调用 run_schema 建表（已有表跳过 DDL）。
+    可被启动器 subprocess 调用，也可直接 import 使用。
+    """
+    own = conn is None
+    if own:
+        conn = connect(**{k: v for k, v in MYSQL.items()})
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"CREATE DATABASE IF NOT EXISTS `{DB_NAME}` "
+                f"CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"
+            )
+        conn.select_db(DB_NAME)
+        run_schema(conn)
+        return {"ok": True, "msg": f"数据库 {DB_NAME} 已就绪（建库/建表完成）"}
+    except Exception as e:
+        return {"ok": False, "msg": f"数据库初始化失败: {e}"}
+    finally:
+        if own:
+            conn.close()
 
 
 def seed_employees(conn):
@@ -169,21 +201,72 @@ def gen_attendance(conn):
         print(f"[attendance] 已生成 {n} 条记录（{len(emp_ids)} 人 × {len(workdays)} 工作日）")
 
 
+
+# ------------------------------------------------------------
+# 演示数据：从 contracts/seed.sql 读取确定性 SQL 并执行（非随机生成器）
+# 用法：
+#   python setup_mysql.py --seed-demo            # 仅对空表造数（seed.sql 各段自带幂等守卫）
+#   python setup_mysql.py --seed-demo --reset    # 清空 5 张表后重新造数
+# 说明：数据全部写在 contracts/seed.sql（可被人工审查/修改），本函数只负责执行。
+# ------------------------------------------------------------
+SEED_SQL_PATH = ROOT_DIR / "contracts" / "seed.sql"
+
+
+def seed_from_sql(conn):
+    if not SEED_SQL_PATH.exists():
+        print(f"[seed] 未找到 {SEED_SQL_PATH}，跳过（如需演示数据请确认 contracts/seed.sql 存在）")
+        return
+    sql = SEED_SQL_PATH.read_text(encoding="utf-8")
+    stmts, buf = [], ""
+    for line in sql.splitlines():
+        if line.strip().startswith("--"):
+            continue
+        buf += line + "\n"
+        if line.strip().endswith(";"):
+            stmts.append(buf.strip())
+            buf = ""
+    with conn.cursor() as cur:
+        n = 0
+        for s in stmts:
+            cur.execute(s)
+            conn.commit()   # 每条提交一次：单条失败不影响前面已写入的数据
+            n += 1
+    print(f"[seed] 已执行 {n} 条演示数据 SQL（来自 contracts/seed.sql）")
+
+
+def _reset_all(conn):
+    with conn.cursor() as cur:
+        cur.execute("SET FOREIGN_KEY_CHECKS=0")
+        for t in ("assessment_log", "reimbursement", "attendance", "salary", "employees"):
+            cur.execute(f"DELETE FROM {DB_NAME}.{t}")
+            cur.execute(f"ALTER TABLE {DB_NAME}.{t} AUTO_INCREMENT=1")
+        cur.execute("SET FOREIGN_KEY_CHECKS=1")
+    conn.commit()
+    print("[reset] 已清空 5 张表")
+
+
+def seed_demo(conn, reset=False):
+    if reset:
+        _reset_all(conn)
+    seed_from_sql(conn)
+    print("[seed-demo] 演示数据生成完成")
+
+
 def main():
-    conn = connect(**MYSQL)
-    conn.select_db(DB_NAME)
+    conn = connect(**{k: v for k, v in MYSQL.items()})
     try:
-        run_schema(conn)
-        if "--seed-employees" in sys.argv:
+        ensure_database(conn)
+        if "--seed-demo" in sys.argv:
+            seed_demo(conn, reset="--reset" in sys.argv)
+        elif "--seed-employees" in sys.argv:
             seed_employees(conn)
-        gen_attendance(conn)
+            if SEED_ATTENDANCE:
+                gen_attendance(conn)
+        elif SEED_ATTENDANCE:
+            gen_attendance(conn)
         with conn.cursor() as cur:
             for t in ("employees", "attendance", "reimbursement", "salary", "assessment_log"):
                 cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.{t}")
                 print(f"  表 {t}: {cur.fetchone()['c']} 行")
     finally:
         conn.close()
-
-
-if __name__ == "__main__":
-    main()
