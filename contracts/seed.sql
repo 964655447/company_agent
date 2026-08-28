@@ -80,14 +80,14 @@ WHERE DAYOFWEEK(md.d) BETWEEN 2 AND 6
   AND (SELECT COUNT(*) FROM attendance) = 0;
 
 -- ------------------------------------------------------------
--- 3) salary 工资核算（按岗位算基本工资/绩效/津贴；已存在则跳过）
+-- 3) salary 工资核算（按岗位算基本工资/绩效/津贴；字段严格 9 列）
+--    gross_salary = base_salary + performance_bonus + allowance
 -- ------------------------------------------------------------
-INSERT INTO salary (no, emp_id, name, position, base_salary, performance_rating, performance_bonus, allowance, gross_salary, period)
+INSERT INTO salary (no, id, name, position, base_salary, performance_rating, performance_bonus, allowance, gross_salary)
 SELECT no, emp_id, name, position, base, rating,
        ROUND(base * CASE rating WHEN 'S' THEN 0.40 WHEN 'A' THEN 0.30 WHEN 'B' THEN 0.20 WHEN 'C' THEN 0.10 ELSE 0.0 END, 2) AS performance_bonus,
        allow,
-       ROUND(base + base * CASE rating WHEN 'S' THEN 0.40 WHEN 'A' THEN 0.30 WHEN 'B' THEN 0.20 WHEN 'C' THEN 0.10 ELSE 0.0 END + allow, 2) AS gross_salary,
-       DATE_FORMAT(CURDATE(), '%Y-%m') AS period
+       ROUND(base + base * CASE rating WHEN 'S' THEN 0.40 WHEN 'A' THEN 0.30 WHEN 'B' THEN 0.20 WHEN 'C' THEN 0.10 ELSE 0.0 END + allow, 2) AS gross_salary
 FROM (
   SELECT e.no, e.emp_id, e.name, e.position,
          CASE e.position

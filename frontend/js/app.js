@@ -309,14 +309,15 @@ $("#perf-form").addEventListener("submit", async (e) => {
 function renderSlip(r) {
   $("#salary-result").innerHTML = `
     <div class="slip">
-      <div class="slip-head"><b>${esc(r.period)} 工资条</b><span style="color:var(--ink-3)">${esc(r.name || "")} · ${esc(r.position || "")}</span></div>
+      <div class="slip-head"><b>${esc(r.name || "")} · ${esc(r.position || "")}</b><span style="color:var(--ink-3)">工号 ${esc(r.id)}</span></div>
       <div class="slip-rows">
-        <div class="row"><span>基本工资</span><span>¥ ${money(r.base)}</span></div>
-        <div class="row"><span>绩效工资</span><span>¥ ${money(r.performance)}</span></div>
-        <div class="row"><span>补贴</span><span>¥ ${money(r.subsidy)}</span></div>
+        <div class="row"><span>基本工资</span><span>¥ ${money(r.base_salary)}</span></div>
+        <div class="row"><span>绩效评级</span><span>${esc(r.performance_rating)}</span></div>
+        <div class="row"><span>绩效奖金</span><span>¥ ${money(r.performance_bonus)}</span></div>
+        <div class="row"><span>津贴</span><span>¥ ${money(r.allowance)}</span></div>
         <div class="row"><span>绩效评分</span><span>${r.performance_score ?? "-"} / 100</span></div>
       </div>
-      <div class="slip-total"><span>应发合计</span><span class="val">¥ ${money(r.total)}</span></div>
+      <div class="slip-total"><span>应发工资</span><span class="val">¥ ${money(r.gross_salary)}</span></div>
       ${r.reasoning ? `<div class="slip-reason">AI 评语：${esc(r.reasoning)}</div>` : ""}
     </div>`;
 }
@@ -325,12 +326,14 @@ async function loadMySalary() {
   const data = await api("/api/salary/my");
   const rows = data.records || [];
   const tbody = rows.length ? rows.map((r) => `
-    <tr><td>${esc(r.period)}</td><td style="text-align:right">${money(r.base)}</td>
-    <td style="text-align:right">${money(r.performance)}</td>
-    <td style="text-align:right">${money(r.subsidy)}</td>
-    <td style="text-align:right"><b>${money(r.total)}</b></td></tr>`).join("")
-    : `<tr class="empty"><td colspan="5">${emptyHTML("暂无工资条，提交绩效后生成", "完成绩效评估后将自动生成")}</td></tr>`;
-  $("#salary-table").innerHTML = `<thead><tr><th>月份</th><th>基本</th><th>绩效</th><th>补贴</th><th>合计(元)</th></tr></thead><tbody>${tbody}</tbody>`;
+    <tr><td>${esc(r.no)}</td><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${esc(r.position)}</td>
+      <td style="text-align:right">${money(r.base_salary)}</td>
+      <td style="text-align:center">${esc(r.performance_rating)}</td>
+      <td style="text-align:right">${money(r.performance_bonus)}</td>
+      <td style="text-align:right">${money(r.allowance)}</td>
+      <td style="text-align:right"><b>${money(r.gross_salary)}</b></td></tr>`).join("")
+    : `<tr class="empty"><td colspan="9">${emptyHTML("暂无工资核算记录，提交绩效后生成", "完成绩效评估后将自动生成")}</td></tr>`;
+  $("#salary-table").innerHTML = `<thead><tr><th>序号</th><th>工号</th><th>姓名</th><th>岗位</th><th>基本工资</th><th>评级</th><th>绩效奖金</th><th>津贴</th><th>应发工资</th></tr></thead><tbody>${tbody}</tbody>`;
 }
 
 /* ---------------- 考核 ---------------- */
@@ -480,23 +483,83 @@ $("#admin-reimb-table").addEventListener("click", async (e) => {
   } catch (err) { toast(err.message, "err"); loading(btn, false); }
 });
 
+let lastSalaryRows = [];
 async function loadAdminSalary() {
   try {
     const r = await api("/api/salary/report");
+    lastSalaryRows = r.rows || [];
     $("#admin-salary-stats").innerHTML =
       statCard("工资条数", r.stats.slip_count) +
       statCard("工资总额", money(r.stats.total_payroll), "元") +
       statCard("平均工资", money(r.stats.avg_pay), "元");
     $("#admin-salary-analysis").innerHTML = `<div class="ana-title">🤖 AI 稳定性分析</div><div class="ana-body">${esc(r.analysis || "")}</div>`;
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
-      <tr><td>${esc(row.period)}</td><td>${esc(row.employee_name)}</td><td>${esc(row.position || "")}</td>
-      <td style="text-align:right">${money(row.base)}</td><td style="text-align:right">${money(row.performance)}</td>
-      <td style="text-align:right">${money(row.subsidy)}</td>
-      <td style="text-align:right"><b>${money(row.total)}</b></td></tr>`).join("")
-      : `<tr class="empty"><td colspan="7">${emptyHTML("暂无工资数据")}</td></tr>`;
-    $("#admin-salary-table").innerHTML = `<thead><tr><th>月份</th><th>员工</th><th>岗位</th><th>基本</th><th>绩效</th><th>补贴</th><th>合计(元)</th></tr></thead><tbody>${tbody}</tbody>`;
+      <tr data-id="${esc(row.id)}">
+        <td>${esc(row.no)}</td><td>${esc(row.id)}</td><td>${esc(row.name)}</td><td>${esc(row.position || "")}</td>
+        <td style="text-align:right">${money(row.base_salary)}</td>
+        <td style="text-align:center">${esc(row.performance_rating)}</td>
+        <td style="text-align:right">${money(row.performance_bonus)}</td>
+        <td style="text-align:right">${money(row.allowance)}</td>
+        <td style="text-align:right"><b>${money(row.gross_salary)}</b></td>
+        <td><button class="btn-ghost btn-sm" data-sal-edit="${esc(row.id)}">编辑</button></td>
+      </tr>`).join("")
+      : `<tr class="empty"><td colspan="10">${emptyHTML("暂无工资数据")}</td></tr>`;
+    $("#admin-salary-table").innerHTML = `<thead><tr><th>序号</th><th>工号</th><th>姓名</th><th>岗位</th><th>基本工资</th><th>评级</th><th>绩效奖金</th><th>津贴</th><th>应发工资</th><th>操作</th></tr></thead><tbody>${tbody}</tbody>`;
   } catch (err) { console.error(err); }
 }
+
+/* ---------------- 工资核算编辑（管理者）---------------- */
+function recalcGross() {
+  const b = Number($("#sf-base").value || 0), p = Number($("#sf-bonus").value || 0), a = Number($("#sf-allow").value || 0);
+  $("#sf-gross").value = (b + p + a).toFixed(2);
+}
+["sf-base", "sf-bonus", "sf-allow"].forEach((i) => $("#" + i).addEventListener("input", recalcGross));
+$("#salary-cancel-btn").addEventListener("click", () => $("#salary-edit-card").classList.add("hidden"));
+
+$("#admin-salary-table").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-sal-edit]");
+  if (!btn) return;
+  const id = Number(btn.dataset.salEdit);
+  const row = (lastSalaryRows || []).find((x) => Number(x.id) === id);
+  if (!row) return;
+  $("#salary-edit-title").textContent = `编辑工资核算：${row.name}（${row.id}）`;
+  $("#sf-no").value = row.no;
+  $("#sf-id").value = row.id;
+  $("#sf-name").value = row.name;
+  $("#sf-position").value = row.position;
+  $("#sf-base").value = row.base_salary;
+  $("#sf-rating").value = row.performance_rating;
+  $("#sf-bonus").value = row.performance_bonus;
+  $("#sf-allow").value = row.allowance;
+  recalcGross();
+  setMsg($("#salary-msg"), "");
+  $("#salary-edit-card").classList.remove("hidden");
+  $("#salary-edit-card").scrollIntoView({ behavior: "smooth" });
+});
+
+$("#salary-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = Number($("#sf-id").value);
+  const body = {
+    no: Number($("#sf-no").value),
+    name: $("#sf-name").value.trim(),
+    position: $("#sf-position").value.trim(),
+    base_salary: Number($("#sf-base").value || 0),
+    performance_rating: $("#sf-rating").value,
+    performance_bonus: Number($("#sf-bonus").value || 0),
+    allowance: Number($("#sf-allow").value || 0),
+    gross_salary: Number($("#sf-gross").value || 0),
+  };
+  const btn = $("#salary-form button[type=submit]");
+  loading(btn, true, "保存中…");
+  try {
+    await api(`/api/salary/${id}`, { method: "PUT", json: body });
+    setMsg($("#salary-msg"), "已保存", "ok");
+    $("#salary-edit-card").classList.add("hidden");
+    loadAdminSalary();
+  } catch (err) { setMsg($("#salary-msg"), err.message, "err"); }
+  finally { loading(btn, false); }
+});
 
 async function loadAdminAssess() {
   try {

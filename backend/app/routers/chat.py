@@ -62,14 +62,13 @@ def _reply_reimbursement(user, db) -> str:
 
 def _reply_salary(user, db) -> str:
     rows = db.scalars(select(Salary).where(
-        Salary.emp_id == user.emp_id,
-    ).order_by(Salary.period.desc())).all()
+        Salary.id == user.emp_id,
+    )).all()
     if not rows:
-        return "还没有工资条。到「工资核算」页面提交绩效达成情况即可生成本月工资条。"
+        return "还没有工资核算记录。到「工资核算」页面提交绩效达成情况即可生成。"
     r = rows[0]
-    return (f"最新工资条（{r.period}）：基本 {r.base_salary:.0f} + 绩效奖金 {r.performance_bonus:.0f} + "
-            f"津贴 {r.allowance:.0f} = 应发 {r.gross_salary:.0f} 元（评级 {r.performance_rating}）。"
-            f"\n历史共 {len(rows)} 期。")
+    return (f"最新工资核算（工号 {r.id} {r.name}）：基本 {r.base_salary:.0f} + 绩效奖金 {r.performance_bonus:.0f} + "
+            f"津贴 {r.allowance:.0f} = 应发 {r.gross_salary:.0f} 元（评级 {r.performance_rating}）。")
 
 
 def _reply_assessment(user, db, params) -> str:

@@ -66,25 +66,21 @@ CREATE TABLE reimbursement (
 ) COMMENT='费用报销';
 
 -- ------------------------------------------------------------
--- salary 工资核算表（扁平快照：NO/工号/姓名/岗位 直接内嵌，便于按月导出）
--- 字段来源：用户指定 v2 结构（NO, ID, name, position, base_salary,
---          performance_rating, performance_bonus, allowance, gross_salary）
--- gross_salary = base_salary + performance_bonus + allowance （由应用层计算写入）
+-- salary 工资核算表（扁平快照，字段严格按用户指定 v2：
+--   NO, ID, name, position, base_salary, performance_rating,
+--   performance_bonus, allowance, gross_salary）
+-- ID = 工号（登录账号），为每行主键；gross_salary = base_salary + performance_bonus + allowance
 -- ------------------------------------------------------------
 CREATE TABLE salary (
-  id                 INT AUTO_INCREMENT PRIMARY KEY,
-  no                 INT           NOT NULL            COMMENT '花名册序号 → employees.no',
-  emp_id             BIGINT        NOT NULL            COMMENT '工号（登录账号） → employees.emp_id',
+  no                 INT           NOT NULL            COMMENT '序号（花名册序号）→ employees.no',
+  id                 BIGINT        NOT NULL PRIMARY KEY COMMENT '工号（ID，登录账号）→ employees.emp_id',
   name               VARCHAR(32)   NOT NULL            COMMENT '姓名',
   position           VARCHAR(64)   NOT NULL            COMMENT '岗位',
   base_salary        DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '基本工资',
   performance_rating VARCHAR(8)    NOT NULL DEFAULT 'C' COMMENT '绩效评级 S/A/B/C/D',
   performance_bonus  DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '绩效奖金',
   allowance          DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '津贴/补贴',
-  gross_salary       DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '应发工资 = 基本+绩效奖金+津贴',
-  period             VARCHAR(7)    NOT NULL DEFAULT '' COMMENT '所属月 YYYY-MM（留空表示最新核算）',
-  created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_sal_emp_period (emp_id, period)
+  gross_salary       DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '应发工资 = 基本+绩效奖金+津贴'
 ) COMMENT='工资核算表';
 
 -- ------------------------------------------------------------

@@ -49,20 +49,17 @@ async def submit_performance(body: PerformanceIn,
     allowance = SUBSIDY_DEFAULT
     gross = round(base_salary + perf_bonus + allowance, 2)
     rating = _rating(score)
-    period = f"{date.today():%Y-%m}"
 
-    rec = db.scalar(select(Salary).where(
-        Salary.emp_id == user.emp_id, Salary.period == period))
-    if rec:  # 同月重复提交 → 覆盖
-        rec.no, rec.emp_id, rec.name, rec.position = user.no, user.emp_id, user.name, user.position
+    rec = db.scalar(select(Salary).where(Salary.id == user.emp_id))
+    if rec:  # 重复提交 → 覆盖本人工资核算
+        rec.no, rec.name, rec.position = user.no, user.name, user.position
         rec.base_salary, rec.performance_rating = base_salary, rating
         rec.performance_bonus, rec.allowance, rec.gross_salary = perf_bonus, allowance, gross
     else:
         rec = Salary(
-            no=user.no, emp_id=user.emp_id, name=user.name, position=user.position,
+            id=user.emp_id, no=user.no, name=user.name, position=user.position,
             base_salary=base_salary, performance_rating=rating,
-            performance_bonus=perf_bonus, allowance=allowance,
-            gross_salary=gross, period=period,
+            performance_bonus=perf_bonus, allowance=allowance, gross_salary=gross,
         )
         db.add(rec)
     db.commit()
@@ -77,9 +74,44 @@ async def submit_performance(body: PerformanceIn,
 def my_salary(user: Employee = Depends(get_current_user),
               db: Session = Depends(get_db)):
     rows = db.scalars(select(Salary).where(
-        Salary.emp_id == user.emp_id,
-    ).order_by(Salary.period.desc())).all()
+        Salary.id == user.emp_id,
+    )).all()
     return {"records": [r.to_dict() for r in rows]}
+
+
+class SalaryUpsert(BaseModel):
+    """管理者编辑工资核算（9 字段全量更新）。"""
+    no: int | None = None
+    name: str | None = None
+    position: str | None = None
+    base_salary: float = 0
+    performance_rating: str = "C"
+    performance_bonus: float = 0
+    allowance: float = 0
+    gross_salary: float = 0
+
+
+@router.put("/{emp_id}")
+async def upsert_salary(emp_id: int, body: SalaryUpsert,
+                        manager: Employee = Depends(require_manager),
+                        db: Session = Depends(get_db)):
+    emp = db.scalar(select(Employee).where(Employee.emp_id == emp_id))
+    if not emp:
+        return {"error": f"工号 {emp_id} 不存在"}
+    rec = db.scalar(select(Salary).where(Salary.id == emp_id))
+    if not rec:
+        rec = Salary(id=emp_id)
+        db.add(rec)
+    rec.no = body.no if body.no is not None else emp.no
+    rec.name = body.name if body.name is not None else emp.name
+    rec.position = body.position if body.position is not None else emp.position
+    rec.base_salary = body.base_salary
+    rec.performance_rating = body.performance_rating
+    rec.performance_bonus = body.performance_bonus
+    rec.allowance = body.allowance
+    rec.gross_salary = body.gross_salary
+    db.commit()
+    return rec.to_dict()
 
 
 @router.get("/report")
@@ -93,8 +125,8 @@ async def salary_report(manager: Employee = Depends(require_manager),
         visible = {e.emp_id: e for e in emps
                    if e.position in perms or e.emp_id == manager.emp_id}
     rows = db.scalars(select(Salary).where(
-        Salary.emp_id.in_(visible.keys()),
-    ).order_by(Salary.period.desc())).all()
+        Salary.id.in_(visible.keys()),
+    )).all()
     totals = [r.gross_salary for r in rows]
     stats = {
         "slip_count": len(rows),
@@ -103,7 +135,7 @@ async def salary_report(manager: Employee = Depends(require_manager),
     }
     analysis = await wf5_analysis("salary", f"{date.today():%Y-%m}", stats, str(manager.emp_id))
     return {
-        "rows": [r.to_dict() for r in rows],
+        "rows": [{**r.to_dict(), "employee_name": r.name} for r in rows],
         "stats": stats,
         "analysis": analysis,
     }

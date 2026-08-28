@@ -92,11 +92,9 @@ class Reimbursement(Base):
 
 class Salary(Base):
     __tablename__ = "salary"
-    __table_args__ = (UniqueConstraint("emp_id", "period", name="uk_sal_emp_period"),)
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    no = Column(Integer, nullable=False)                      # 花名册序号
-    emp_id = Column(BigInteger, nullable=False)               # 工号
+    no = Column(Integer, nullable=False)                       # 序号（花名册序号）
+    id = Column(BigInteger, primary_key=True)                 # 工号（= employees.emp_id）
     name = Column(String(32), nullable=False)
     position = Column(String(64), nullable=False)
     base_salary = Column(Float, nullable=False, default=0)    # 基本工资
@@ -104,19 +102,16 @@ class Salary(Base):
     performance_bonus = Column(Float, nullable=False, default=0)        # 绩效奖金
     allowance = Column(Float, nullable=False, default=0)       # 津贴/补贴
     gross_salary = Column(Float, nullable=False, default=0)   # 应发工资
-    period = Column(String(7), nullable=False, default="")    # YYYY-MM
-    created_at = Column(DateTime, nullable=False, default=datetime.now)
 
     def to_dict(self) -> dict:
         return {
-            "no": self.no, "emp_id": self.emp_id, "name": self.name,
+            "no": self.no, "id": self.id, "name": self.name,
             "position": self.position,
             "base_salary": round(self.base_salary, 2),
             "performance_rating": self.performance_rating,
             "performance_bonus": round(self.performance_bonus, 2),
             "allowance": round(self.allowance, 2),
             "gross_salary": round(self.gross_salary, 2),
-            "period": self.period,
         }
 
 
