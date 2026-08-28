@@ -53,9 +53,7 @@ def _resolve_python():
         if v.exists():
             raw.append(str(v))
     # 常见 Anaconda / 发行版 Python（同事 clone 后若装了 Anaconda 也能自动识别）
-    for p in ("G:/Anaconda3/python.exe",
-              "C:/Users/96465/anaconda3/python.exe",
-              "C:/ProgramData/Anaconda3/python.exe",
+    for p in ("C:/ProgramData/Anaconda3/python.exe",
               "C:/Python313/python.exe", "C:/Python312/python.exe"):
         if os.path.exists(p):
             raw.append(p)
