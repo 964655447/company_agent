@@ -24,6 +24,7 @@ import socket
 import urllib.request
 import urllib.error
 import urllib.parse
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -147,30 +148,73 @@ def seed_db() -> dict:
         return {"ok": False, "msg": f"生成异常：{e}"}
 
 
+def _parse_db_url(url: str) -> dict:
+    """mysql+pymysql://user:pwd@host:port/db -> dict。解析失败返回空。"""
+    m = re.match(r"^mysql\+pymysql://([^:]+):([^@]*)@([^:/]+):?(\d+)?/(.+)$", url or "")
+    if not m:
+        return {}
+    return {"user": m.group(1), "pwd": m.group(2), "host": m.group(3),
+            "port": m.group(4) or "3306", "db": m.group(5)}
+
+
 def write_env_from_form(form: dict) -> str:
-    """根据表单生成 backend/.env（基于 .env.example 模板，替换 DB_URL 与 DIFY_KEY_WF6）。"""
-    host = (form.get("host") or "127.0.0.1").strip()
-    port = (form.get("port") or "3306").strip()
-    user = (form.get("user") or "root").strip()
+    """根据表单生成 backend/.env（基于 .env.example 模板，替换 DB_URL 与 DIFY_KEY_WF6）。
+
+    重新配置时：表单为空的项会回退到已有 .env 的对应值，避免把 Dify Key 等项清空。
+    """
+    host = (form.get("host") or "").strip()
+    port = (form.get("port") or "").strip()
+    user = (form.get("user") or "").strip()
     pwd = (form.get("pwd") or "").strip()
-    db = (form.get("db") or "company_agent").strip()
+    db = (form.get("db") or "").strip()
     dify = (form.get("dify") or "").strip()
+
+    # 读取已有 .env，作为回退源
+    cur = {}
+    if BACKEND_ENV.exists():
+        for line in BACKEND_ENV.read_text(encoding="utf-8").splitlines():
+            if "=" in line and not line.strip().startswith("#"):
+                k, v = line.split("=", 1)
+                cur[k.strip()] = v.strip()
+    existing = _parse_db_url(cur.get("DB_URL", ""))
+
+    host = host or existing.get("host") or "127.0.0.1"
+    port = port or existing.get("port") or "3306"
+    user = user or existing.get("user") or "root"
+    pwd = pwd or existing.get("pwd") or ""
+    db = db or existing.get("db") or "company_agent"
+    dify = dify or cur.get("DIFY_KEY_WF6", "")
     db_url = f"mysql+pymysql://{user}:{pwd}@{host}:{port}/{db}"
+
     tpl_path = ROOT_DIR / ".env.example"
     tpl = tpl_path.read_text(encoding="utf-8") if tpl_path.exists() else ""
     out = []
+    seen_db = seen_dify = False
     for line in tpl.splitlines():
         if line.startswith("DB_URL="):
             out.append(f"DB_URL={db_url}")
+            seen_db = True
         elif line.startswith("DIFY_KEY_WF6="):
             out.append(f"DIFY_KEY_WF6={dify}")
+            seen_dify = True
         else:
-            out.append(line)
+            # 模板里留空的自定义项（如 ROSTER_XLSX=），若已有 .env 有值则沿用
+            key = line.split("=", 1)[0].strip() if "=" in line else ""
+            if key and key in cur and cur[key] and line.strip() == key + "=":
+                out.append(f"{key}={cur[key]}")
+            else:
+                out.append(line)
     # 若模板里没有这两个 key（兜底），手动补
-    if not any(l.startswith("DB_URL=") for l in out):
+    if not seen_db:
         out.append(f"DB_URL={db_url}")
-    if not any(l.startswith("DIFY_KEY_WF6=") for l in out):
+    if not seen_dify:
         out.append(f"DIFY_KEY_WF6={dify}")
+    # 保留模板之外的已有自定义配置（如 ROSTER_XLSX、SEED_ATTENDANCE）
+    for k, v in cur.items():
+        if k in ("DB_URL", "DIFY_KEY_WF6"):
+            continue
+        if not any(l.startswith(k + "=") for l in out):
+            out.append(f"{k}={v}")
     BACKEND_ENV.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
     return db_url
 
@@ -292,8 +336,8 @@ SETUP_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <div class="wrap">
-  <h1>公司管理智能体 · 首次配置</h1>
-  <div class="sub">检测到尚未配置数据库，请填写你本机 MySQL 信息，启动器将自动建库建表。</div>
+  <h1>公司管理智能体 · 数据库配置</h1>
+  <div class="sub">请填写你本机 MySQL 信息，启动器将自动建库建表。已配置过也可在此修改密码 / 连接信息。</div>
   <div class="card">
     <form id="f">
       <div class="row">
@@ -327,7 +371,7 @@ document.getElementById('f').onsubmit = async (e)=>{
   try{
     const r = await fetch('/api/setup', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body});
     const d = await r.json();
-    if(d.ok){ toast('数据库已就绪，正在进入控制台…'); setTimeout(()=>location.reload(), 1200); }
+    if(d.ok){ toast('数据库已就绪，正在进入控制台（若后端已在运行，请先停止再启动使新密码生效）…'); setTimeout(()=>location.href='/', 1400); }
     else { toast(d.msg); btn.disabled = false; btn.textContent = '保存并初始化数据库'; }
   }catch(err){ toast('请求失败: '+err); btn.disabled = false; btn.textContent = '保存并初始化数据库'; }
 };
@@ -449,6 +493,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <button class="b-open" id="btn-fe">打开前端页面</button>
     <button class="b-link" id="btn-docs">后端 API 文档</button>
     <button class="b-link" id="btn-seed">生成演示数据</button>
+    <button class="b-link" id="btn-setup">配置数据库</button>
     <button class="b-link" id="btn-refresh">立即刷新状态</button>
   </div>
 
@@ -498,6 +543,7 @@ document.getElementById('btn-seed').onclick = async ()=>{
   refresh();
 };
 document.getElementById('btn-refresh').onclick = refresh;
+document.getElementById('btn-setup').onclick = ()=> location.href = '/setup';
 
 refresh(); setInterval(refresh, 3000);
 </script>
@@ -595,6 +641,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._send(200, SETUP_HTML, "text/html; charset=utf-8")
             else:
                 self._send(200, DASHBOARD_HTML, "text/html; charset=utf-8")
+        elif path == "/setup":
+            # 常驻配置页：无论是否已配置，都可直接访问（用于首次配置或修改密码）
+            self._send(200, SETUP_HTML, "text/html; charset=utf-8")
         elif path == "/api/status":
             self._send(200, json.dumps(get_status(), ensure_ascii=False))
         elif path.startswith("/fe/"):
