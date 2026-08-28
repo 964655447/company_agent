@@ -270,3 +270,7 @@ def main():
                 print(f"  表 {t}: {cur.fetchone()['c']} 行")
     finally:
         conn.close()
+
+
+if __name__ == "__main__":
+    main()
