@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公司管理智能体</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ================= 登录页 ================= -->
+<div id="login-page" class="login-wrap">
+  <div class="login-grid"></div>
+  <div class="login-blob b1"></div>
+  <div class="login-blob b2"></div>
+  <div class="login-blob b3"></div>
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 5.9L20.5 10l-6.1 2.1L12 18l-2.4-5.9L3.5 10l6.1-2.1z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
+    </div>
+    <h1>公司管理智能体</h1>
+    <p class="login-sub">考勤 · 报销 · 工资 · 考核 一站式管理</p>
+    <form id="login-form">
+      <label>工号</label>
+      <input type="text" id="login-empid" placeholder="请输入工号，如 220401" autocomplete="username">
+      <label>密码</label>
+      <input type="password" id="login-pwd" placeholder="请输入登录密码" autocomplete="current-password">
+      <div id="login-err" class="login-err"></div>
+      <button type="submit" class="btn-primary btn-block">登 录</button>
+    </form>
+    <p class="login-tip">
+      演示账号：<code>220401</code> 总经理 冯霞 · 密码 <code>GZVwRDW0a6b</code><br>
+      <code>220406</code> 营销专员 许梦 · 密码 <code>EgRebcmQo4</code>
+    </p>
+  </div>
+</div>
+
+<!-- ================= 主应用 ================= -->
+<div id="app-page" class="app-wrap hidden">
+  <!-- 移动端顶栏 -->
+  <header class="topbar">
+    <button class="hamburger" id="hamburger" aria-label="打开菜单" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <span class="topbar-title" id="topbar-title">公司管理智能体</span>
+    <button class="topbar-avatar" id="topbar-avatar" aria-label="退出登录"></button>
+  </header>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 5.9L20.5 10l-6.1 2.1L12 18l-2.4-5.9L3.5 10l6.1-2.1z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
+      </span>
+      公司管理智能体
+    </div>
+    <div id="ai-status" class="ai-status"></div>
+    <nav id="nav"></nav>
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <div class="avatar" id="user-avatar">员</div>
+        <div class="user-meta">
+          <div id="user-name" class="user-name"></div>
+          <div id="user-dept" class="user-dept"></div>
+        </div>
+      </div>
+      <button id="logout-btn" class="btn-ghost btn-block">退出登录</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- 考勤打卡 -->
+    <section id="view-checkin" class="view">
+      <h2 class="view-title">考勤打卡</h2>
+      <div class="checkin-hero card">
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="clock-date" id="clock-date"></div>
+        <div class="checkin-btns">
+          <button class="btn-primary btn-lg" data-checkin="clock_in">上班打卡</button>
+          <button class="btn-outline btn-lg" data-checkin="clock_out">下班打卡</button>
+        </div>
+        <div id="checkin-msg" class="checkin-msg"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>我的考勤记录</h3>
+          <div class="seg" id="att-period">
+            <button class="seg-btn active" data-p="week">本周</button>
+            <button class="seg-btn" data-p="month">本月</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table class="tbl" id="att-table"></table></div>
+      </div>
+    </section>
+
+    <!-- 费用报销 -->
+    <section id="view-reimb" class="view">
+      <h2 class="view-title">费用报销</h2>
+      <div class="cols-2">
+        <div class="card">
+          <div class="card-head"><h3>提交报销</h3></div>
+          <form id="reimb-form" class="form">
+            <label>报销类目 *</label>
+            <select id="reimb-category">
+              <option value="">请选择类目</option>
+              <option>交通</option><option>餐饮</option><option>住宿</option>
+              <option>办公</option><option>通讯</option><option>其他</option>
+            </select>
+            <label>金额（元）*</label>
+            <input type="number" id="reimb-amount" min="0" step="0.01" placeholder="0.00">
+            <label>费用说明</label>
+            <textarea id="reimb-desc" rows="2" placeholder="简述费用事由"></textarea>
+            <label>发票/凭证图片</label>
+            <input type="file" id="reimb-files" multiple accept="image/*,.pdf">
+            <button type="submit" class="btn-primary">提交报销</button>
+            <div id="reimb-msg" class="form-msg"></div>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>我的报销进度</h3></div>
+          <div class="table-wrap"><table class="tbl" id="reimb-table"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 工资核算 -->
+    <section id="view-salary" class="view">
+      <h2 class="view-title">工资核算</h2>
+      <div class="card">
+        <div class="card-head"><h3>提交绩效达成情况</h3></div>
+        <form id="perf-form" class="form">
+          <textarea id="perf-input" rows="3" placeholder="例如：本月完成 3 个大单，回款率 95%，客户零投诉"></textarea>
+          <button type="submit" class="btn-primary">生成本月工资条</button>
+          <div class="form-tip">绩效由 AI 大脑（Dify 工作流 WF-3）评估；基本工资与补贴由系统按岗位基数计算。</div>
+          <div id="perf-msg" class="form-msg"></div>
+        </form>
+      </div>
+      <div id="salary-result"></div>
+      <div class="card">
+        <div class="card-head"><h3>历史工资条</h3></div>
+        <div class="table-wrap"><table class="tbl" id="salary-table"></table></div>
+      </div>
+    </section>
+
+    <!-- 进阶考核 -->
+    <section id="view-assess" class="view">
+      <h2 class="view-title">进阶考核 · 岗位知识</h2>
+      <div class="card">
+        <div class="card-head"><h3>查询岗位</h3></div>
+        <form id="assess-form" class="assess-form">
+          <input list="position-list" id="assess-position" placeholder="输入想了解的岗位，如：调度经理">
+          <datalist id="position-list">
+            <option>总经理</option><option>商务总监</option><option>营销经理</option>
+            <option>营销专员</option><option>运营总监</option><option>调度经理</option>
+            <option>调度专员</option><option>运营经理</option><option>运营专员</option>
+            <option>客服经理</option><option>客服专员</option><option>总车队长</option>
+            <option>车队长</option><option>车队文员</option><option>财务总监</option>
+            <option>会计</option><option>出纳</option><option>审核</option>
+          </datalist>
+          <button type="submit" class="btn-primary">查询岗位</button>
+        </form>
+        <div class="form-tip">岗位介绍与能力要求来自 AI 大脑（Dify 知识库 WF-4），助力转岗与升职规划。</div>
+      </div>
+      <div id="assess-result"></div>
+    </section>
+
+    <!-- 智能助手 -->
+    <section id="view-chat" class="view">
+      <h2 class="view-title">智能助手</h2>
+      <div class="card chat-card">
+        <div id="chat-log" class="chat-log"></div>
+        <form id="chat-form" class="chat-input-row">
+          <input id="chat-input" placeholder="例如：我这个月迟到几次了 / 我的报销到哪一步了">
+          <button type="submit" class="btn-primary">发送</button>
+        </form>
+        <div class="chat-tip">试试：「本周打卡记录」「最新工资条」「查一下调度经理的岗位要求」</div>
+      </div>
+    </section>
+
+    <!-- 管理看板（管理者） -->
+    <section id="view-admin" class="view">
+      <h2 class="view-title">管理看板</h2>
+      <div class="seg seg-lg" id="admin-tabs">
+        <button class="seg-btn active" data-t="att">考勤分析</button>
+        <button class="seg-btn" data-t="reimb">报销审批</button>
+        <button class="seg-btn" data-t="salary">工资总览</button>
+        <button class="seg-btn" data-t="assess">考核动态</button>
+      </div>
+
+      <div id="admin-att" class="admin-pane">
+        <div class="card-head-inline">
+          <div class="seg" id="admin-att-period">
+            <button class="seg-btn active" data-p="week">本周</button>
+            <button class="seg-btn" data-p="month">本月</button>
+          </div>
+        </div>
+        <div id="admin-att-stats" class="stat-row"></div>
+        <div class="card analysis-card" id="admin-att-analysis"></div>
+        <div class="card">
+          <div class="card-head"><h3>考勤明细</h3></div>
+          <div class="table-wrap"><table class="tbl" id="admin-att-table"></table></div>
+        </div>
+      </div>
+
+      <div id="admin-reimb" class="admin-pane hidden">
+        <div id="admin-reimb-stats" class="stat-row"></div>
+        <div class="card analysis-card" id="admin-reimb-analysis"></div>
+        <div class="card">
+          <div class="card-head"><h3>报销单列表</h3></div>
+          <div class="table-wrap"><table class="tbl" id="admin-reimb-table"></table></div>
+        </div>
+      </div>
+
+      <div id="admin-salary" class="admin-pane hidden">
+        <div id="admin-salary-stats" class="stat-row"></div>
+        <div class="card analysis-card" id="admin-salary-analysis"></div>
+        <div class="card">
+          <div class="card-head"><h3>工资明细</h3></div>
+          <div class="table-wrap"><table class="tbl" id="admin-salary-table"></table></div>
+        </div>
+      </div>
+
+      <div id="admin-assess" class="admin-pane hidden">
+        <div class="card">
+          <div class="card-head"><h3>下属岗位查询动态</h3></div>
+          <div class="table-wrap"><table class="tbl" id="admin-assess-table"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 花名册维护（管理者） -->
+    <section id="view-roster" class="view">
+      <h2 class="view-title">花名册维护</h2>
+      <div class="card">
+        <div class="card-head">
+          <h3>员工列表</h3>
+          <button id="roster-add-btn" class="btn-primary btn-sm">+ 新增员工</button>
+        </div>
+        <div class="table-wrap"><table class="tbl" id="roster-table"></table></div>
+      </div>
+
+      <div id="roster-edit-card" class="card hidden">
+        <div class="card-head"><h3 id="roster-edit-title">新增员工</h3></div>
+        <form id="roster-form" class="form form-grid">
+          <div><label>工号 *</label><input type="number" id="rf-empid" placeholder="如 220427"></div>
+          <div><label>姓名 *</label><input type="text" id="rf-name" placeholder="姓名"></div>
+          <div><label>岗位 *</label><input type="text" id="rf-position" placeholder="岗位"></div>
+          <div><label>部门 *</label>
+            <select id="rf-dept">
+              <option>总经办</option><option>商务部</option><option>运营部</option>
+              <option>车队</option><option>财务部</option>
+            </select>
+          </div>
+          <div class="full"><label>权限（可访问岗位范围，逗号分隔；多于 1 项即为管理者）</label>
+            <input type="text" id="rf-perms" placeholder="如：营销经理,营销专员"></div>
+          <div><label>密码（新增必填；编辑留空则不改）</label><input type="text" id="rf-pwd" placeholder="初始密码"></div>
+          <div class="full form-actions">
+            <button type="submit" class="btn-primary">保存</button>
+            <button type="button" id="roster-cancel-btn" class="btn-ghost">取消</button>
+          </div>
+          <div id="roster-msg" class="form-msg full"></div>
+        </form>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= 悬浮考勤小助手 ================= -->
+<div id="float-bubble" class="float-bubble hidden" title="考勤小助手" role="button" tabindex="0" aria-label="打开考勤小助手">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+  <span class="float-bubble-dot"></span>
+</div>
+
+<div id="float-panel" class="float-panel hidden" role="dialog" aria-label="考勤小助手">
+  <div class="float-head">
+    <div class="float-head-info">
+      <span class="float-head-ico">🕘</span>
+      <div>
+        <div class="float-title">考勤小助手</div>
+        <div class="float-sub" id="float-sub">问我考勤问题，秒回答案</div>
+      </div>
+    </div>
+    <button class="float-close" id="float-close" aria-label="关闭">×</button>
+  </div>
+  <div class="float-log" id="float-log" aria-live="polite"></div>
+  <div class="float-quick" id="float-quick">
+    <button data-q="这个月我考勤多少天？">这个月考勤多少天</button>
+    <button data-q="本月我迟到几次了？">本月迟到几次</button>
+    <button data-q="本周我的出勤情况怎么样？">本周出勤情况</button>
+  </div>
+  <form id="float-form" class="float-input-row">
+    <input id="float-input" placeholder="如：这个月我考勤多少天？" autocomplete="off">
+    <button type="submit" class="btn-primary btn-sm" id="float-send">发送</button>
+  </form>
+</div>
+
+<!-- ================= 全局反馈层 ================= -->
+<div class="toast-wrap" id="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+
+<!-- 自定义确认弹窗 -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-icon" id="modal-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    </div>
+    <h3 id="modal-title">确认操作</h3>
+    <p id="modal-text">确定执行此操作吗？</p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modal-cancel">取消</button>
+      <button class="btn-danger" id="modal-ok">确认</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# ===== 密钥 / 环境配置（真实 .env 绝不入库）=====
+.env
+*.env
+.env.*
+!.env.example
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# ===== 前端 / Node =====
+node_modules/
+dist/
+build/
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+
+# ===== 系统 / 临时文件 =====
+.DS_Store
+Thumbs.db
+*.log
+
+# ===== WorkBuddy 项目数据（不入库）=====
+.workbuddy/

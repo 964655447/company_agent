@@ -1,0 +1,121 @@
+"""ORM 模型 —— 字段名与 contracts/database.sql 严格对齐。"""
+import json
+from datetime import datetime, date
+
+from sqlalchemy import (
+    Column, Integer, BigInteger, String, Text, DateTime, Date, Boolean,
+    Float, UniqueConstraint, Index,
+)
+
+from .database import Base
+
+
+class Employee(Base):
+    __tablename__ = "employees"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    no = Column(Integer, nullable=False, unique=True)
+    emp_id = Column(BigInteger, nullable=False, unique=True)   # 工号，登录账号
+    name = Column(String(32), nullable=False, unique=True)
+    password_hash = Column(String(255), nullable=False)
+    permissions = Column(Text, nullable=False, default="[]")  # JSON 数组：可访问岗位范围
+    position = Column(String(64), nullable=False)
+    department = Column(String(64), nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+
+    # ---- 辅助 ----
+    @property
+    def permission_list(self) -> list[str]:
+        try:
+            v = json.loads(self.permissions)
+            return v if isinstance(v, list) else []
+        except Exception:
+            return []
+
+    @property
+    def role(self) -> str:
+        """权限覆盖多于 1 个岗位 => 管理者（与花名册层级完全吻合）。"""
+        return "manager" if len(self.permission_list) > 1 else "employee"
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "no": self.no, "emp_id": self.emp_id,
+            "name": self.name, "permissions": self.permission_list,
+            "position": self.position, "department": self.department,
+            "role": self.role,
+        }
+
+
+class Attendance(Base):
+    __tablename__ = "attendance"
+    __table_args__ = (Index("idx_att_emp_date", "employee_id", "work_date"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(Integer, nullable=False)
+    checkin_time = Column(DateTime, nullable=False)
+    type = Column(String(16), nullable=False)                  # clock_in / clock_out
+    is_late = Column(Boolean, nullable=False, default=False)
+    work_date = Column(Date, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+
+    def to_dict(self) -> dict:
+        return {
+            "employee_id": self.employee_id, "checkin_time": self.checkin_time.isoformat(),
+            "type": self.type, "is_late": self.is_late,
+            "work_date": self.work_date.isoformat(),
+        }
+
+
+class Reimbursement(Base):
+    __tablename__ = "reimbursement"
+    __table_args__ = (Index("idx_reimb_emp_status", "employee_id", "status"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(Integer, nullable=False)
+    category = Column(String(64), nullable=False, default="")
+    amount = Column(Float, nullable=False, default=0)
+    ocr_raw = Column(Text, nullable=True)
+    status = Column(String(16), nullable=False, default="submitted")
+    approver_id = Column(Integer, nullable=True)
+    submit_time = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "employee_id": self.employee_id, "category": self.category,
+            "amount": round(self.amount, 2), "status": self.status,
+            "approver_id": self.approver_id,
+            "submit_time": self.submit_time.isoformat(),
+        }
+
+
+class Salary(Base):
+    __tablename__ = "salary"
+    __table_args__ = (UniqueConstraint("employee_id", "period", name="uk_sal_emp_period"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(Integer, nullable=False)
+    period = Column(String(7), nullable=False)                # YYYY-MM
+    base = Column(Float, nullable=False, default=0)
+    performance = Column(Float, nullable=False, default=0)
+    subsidy = Column(Float, nullable=False, default=0)
+    total = Column(Float, nullable=False, default=0)
+    performance_input = Column(Text, nullable=True)
+    generated_at = Column(DateTime, nullable=False, default=datetime.now)
+
+    def to_dict(self) -> dict:
+        return {
+            "employee_id": self.employee_id, "period": self.period,
+            "base": round(self.base, 2), "performance": round(self.performance, 2),
+            "subsidy": round(self.subsidy, 2), "total": round(self.total, 2),
+        }
+
+
+class AssessmentLog(Base):
+    __tablename__ = "assessment_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(Integer, nullable=False)
+    position_queried = Column(String(64), nullable=False)
+    queried_at = Column(DateTime, nullable=False, default=datetime.now)

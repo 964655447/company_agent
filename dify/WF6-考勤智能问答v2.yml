@@ -1,0 +1,293 @@
+app:
+  description: |-
+    WF-6 考勤智能问答 v2（真智能版）。
+    输入只有用户原话 + 工号，Dify 自己用 LLM 识别意图、用 HTTP 节点查后端 API 拿原始数据、再用 LLM 生成自然语言回答。
+    后端 /api/attendance/query 接口查 MySQL，Dify HTTP 节点调它。
+  icon: "\U0001F552"
+  icon_background: '#6355F7'
+  mode: workflow
+  name: WF6-考勤智能问答v2
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - data:
+          isInIteration: false
+          sourceType: start
+          targetType: parameter-extractor
+        id: edge-start-extractor
+        source: node_start
+        sourceHandle: source
+        target: node_extractor
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: parameter-extractor
+          targetType: http-request
+        id: edge-extractor-http
+        source: node_extractor
+        sourceHandle: source
+        target: node_http
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: http-request
+          targetType: llm
+        id: edge-http-llm
+        source: node_http
+        sourceHandle: source
+        target: node_llm
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: end
+        id: edge-llm-end
+        source: node_llm
+        sourceHandle: source
+        target: node_end
+        targetHandle: target
+        type: custom
+    nodes:
+      - data:
+          desc: 用户原始提问 + 员工工号
+          selected: false
+          title: 开始
+          type: start
+          variables:
+            - label: 用户提问
+              max_length: 480
+              options: []
+              required: true
+              type: text-input
+              variable: question
+            - label: 员工工号
+              max_length: 16
+              options: []
+              required: true
+              type: text-input
+              variable: emp_id
+        id: node_start
+        position:
+          x: 80
+          y: 300
+        positionAbsolute:
+          x: 80
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 150
+      - data:
+          desc: 用 LLM 从自然语言识别 period / intent / target_date
+          model:
+            completion_params:
+              temperature: 0.6
+            mode: chat
+            name: qwen3.5:4b
+            provider: langgenius/ollama/ollama
+          query:
+            - node_start
+            - question
+          parameters:
+            - name: period
+              type: select
+              options:
+                - month
+                - week
+                - last_week
+                - last_month
+                - specific
+                - custom
+              description: 查询周期（本月/本周/上周/上月/特定某天/自定义）
+              required: true
+            - name: intent
+              type: select
+              options:
+                - days
+                - late
+                - avg_time
+                - specific_day
+                - all
+              description: 查询意图（出勤天数/迟到次数/平均打卡时间/查某天/综合）
+              required: true
+            - name: target_date
+              type: string
+              options: []
+              description: 特定日期（仅 period=specific 时填写，格式 YYYY-MM-DD）
+              required: false
+          reasoning_mode: prompt
+          vision:
+            enabled: false
+          instruction: |-
+            从用户的考勤提问中提取结构化参数。
+
+            规则：
+            1. period（查询周期，必填）：month（本月，默认）/ week（本周）/ last_week（上周）/ last_month（上月）/ specific（特定某天）/ custom（自定义区间）
+            2. intent（查询意图，必填）：days（出勤天数）/ late（迟到次数）/ avg_time（平均打卡时间）/ specific_day（查某天打卡）/ all（综合情况，默认）
+            3. target_date（仅 period=specific 时填，格式 YYYY-MM-DD，从问题中解析具体日期；"今天"用当前日期，"昨天"用今天减 1 天）
+            4. 问题提到"上周/本周/本月/上月"等时间词，按词义填 period
+            5. 问"几次/多少次"通常 intent=late，问"多少天/几天"通常 intent=days，问"几点/平均"intent=avg_time，问"X天/X号/周X"intent=specific_day
+
+            示例：
+            - "这个月我考勤多少天" → period=month, intent=days, target_date=空
+            - "上周我迟到几次" → period=last_week, intent=late, target_date=空
+            - "本周三我打卡了吗" → period=specific, intent=specific_day, target_date=本周三的日期
+            - "我平均几点上班" → period=month, intent=avg_time, target_date=空
+          selected: false
+          title: 意图识别
+          type: parameter-extractor
+        id: node_extractor
+        position:
+          x: 380
+          y: 300
+        positionAbsolute:
+          x: 380
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 120
+      - data:
+          desc: 调后端 /api/attendance/query 查 MySQL
+          method: post
+          url: 'http://host.docker.internal:8000/api/attendance/query'
+          authorization:
+            type: no-auth
+            config: null
+          headers: 'Content-Type: application/json'
+          params: ''
+          body:
+            type: json
+            data:
+              - key: ''
+                type: text
+                value: '{"emp_id": "{{#node_start.emp_id#}}", "period": "{{#node_extractor.period#}}", "intent": "{{#node_extractor.intent#}}", "target_date": "{{#node_extractor.target_date#}}"}'
+          ssl_verify: true
+          timeout:
+            connect: null
+            read: null
+            write: null
+          selected: false
+          title: 查询数据库
+          type: http-request
+          variables: []
+        id: node_http
+        position:
+          x: 680
+          y: 300
+        positionAbsolute:
+          x: 680
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 120
+      - data:
+          context:
+            enabled: false
+            variable_selector: []
+          desc: 基于 HTTP 返回的数据库记录生成自然语言回答
+          memory:
+            window:
+              enabled: false
+              size: 10
+          model:
+            completion_params:
+              temperature: 0.6
+            mode: chat
+            name: qwen3.5:4b
+            provider: langgenius/ollama/ollama
+          prompt_template:
+            - id: wf6v2-sys
+              role: system
+              text: |-
+                你是公司考勤助手。后端 API 已经根据用户问题查好了数据库，返回了原始考勤记录 JSON。你的任务是基于这些数据用简洁、友好的中文回答用户的问题。
+
+                硬规则：
+                1. 只能使用下方 API 返回的数据，严禁编造任何数字、日期、时间。
+                2. 回答控制在 3 句话以内，先直接给结论（出勤天数/迟到次数/打卡时间），再给一句简短建议或鼓励。
+                3. 不要出现 JSON、代码块、字段名等技术内容，用自然语言表达。
+                4. 如果 records 为空（record_count=0），回复"本期暂无考勤记录，请先打卡"。
+                5. 如果用户问的是具体某天（intent=specific_day），明确告诉那天有没有打卡、几点打卡、是否迟到。
+                6. 如果用户问的是迟到次数（intent=late），直接说"本月/本周/上周 迟到 X 次"，根据 query.period 字段翻译成中文。
+                7. 时间格式用"X点X分"而不是"HH:MM"。
+            - id: wf6v2-user
+              role: user
+              text: |-
+                用户提问：{{#node_start.question#}}
+
+                后端 API 返回的数据库查询结果（JSON）：
+                {{#node_http.body#}}
+
+                请根据上面的数据回答用户的问题。
+          selected: false
+          title: 生成回答
+          type: llm
+          variables: []
+          vision:
+            enabled: false
+        id: node_llm
+        position:
+          x: 980
+          y: 300
+        positionAbsolute:
+          x: 980
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 120
+      - data:
+          desc: 输出自然语言回答
+          outputs:
+            - value_selector:
+                - node_llm
+                - text
+              variable: answer
+          selected: false
+          title: 结束
+          type: end
+        id: node_end
+        position:
+          x: 1280
+          y: 300
+        positionAbsolute:
+          x: 1280
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 90
