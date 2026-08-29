@@ -1,4 +1,5 @@
 from datetime import datetime, date, timedelta
+import json
 
 import httpx
 
@@ -199,10 +200,22 @@ async def attendance_ask(body: AskIn,
                             if data == "[DONE]":
                                 break
                             try:
-                                import json
                                 chunk = json.loads(data)
                                 content = (chunk.get("answer") or "")
-                                if content:
+                                if not content:
+                                    continue
+                                # Dify Agent 流式响应里 answer 可能既发增量又发全量
+                                # （全量 chunk 会把前面内容整段重发），需去重避免重复。
+                                prev = "".join(parts)
+                                if prev and content.startswith(prev):
+                                    parts = [content]          # 全量覆盖
+                                elif prev:
+                                    ov = 0
+                                    for i in range(1, min(len(prev), len(content)) + 1):
+                                        if prev.endswith(content[:i]):
+                                            ov = i
+                                    parts.append(content[ov:])  # 增量/重叠：截掉重复前缀
+                                else:
                                     parts.append(content)
                             except (json.JSONDecodeError, KeyError):
                                 continue
