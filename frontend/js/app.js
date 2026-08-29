@@ -259,6 +259,7 @@ $("#reimb-form").addEventListener("submit", async (e) => {
   fd.append("category", $("#reimb-category").value);
   fd.append("amount", $("#reimb-amount").value || 0);
   fd.append("desc", $("#reimb-desc").value);
+  fd.append("emp_id", state.user?.emp_id ?? "");
   [...$("#reimb-files").files].forEach((f) => fd.append("files", f));
   setMsg(msgEl, "提交中…");
   loading(btn, true, "提交中…");
@@ -276,7 +277,7 @@ $("#reimb-form").addEventListener("submit", async (e) => {
 });
 
 async function loadMyReimb() {
-  const data = await api("/api/reimbursement/my");
+  const data = await api("/api/reimbursement/my?emp_id=" + (state.user?.emp_id ?? ""));
   const rows = data.records || [];
   const tbody = rows.length ? rows.map((r) => {
     const [txt, cls] = REIMB_STATUS[r.status] || [r.status, "tag-gray"];
