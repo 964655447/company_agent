@@ -30,9 +30,11 @@ BASE_SALARY_MAP = {
 }
 BASE_SALARY_DEFAULT = 6000
 
-# ---------- AI 能力 ----------
-# 2026-08-29 起，所有 AI 分析统一由右下角「智能助手」气泡（/api/chat）承接，
-# 改为由单个「集合所有工作流」的统一智能体处理，不再有 DIFY_* 配置。
+# ---------- AI 能力（统一智能体） ----------
+# 右下角气泡 → Dify Agent（集合所有工作流的统一入口）。
+# 在 Dify 创建 Agent 类型应用，添加工作流工具，发布后拿到 API Key 填入。
+DIFY_BASE_URL = os.environ.get("DIFY_BASE_URL", "http://localhost/v1")
+DIFY_AGENT_KEY = os.environ.get("DIFY_AGENT_KEY", "")
 
 # ---------- 种子数据 ----------
 # 花名册 Excel 路径。默认留空：每个人的花名册在自己机器上，路径不该写进代码。
@@ -54,11 +56,15 @@ def _load_env_file() -> None:
         if k and k not in os.environ:
             os.environ[k] = v
     # 重读一次让上面的默认值拿到 .env 内容
-    global DB_URL, JWT_SECRET
+    global DB_URL, JWT_SECRET, DIFY_BASE_URL, DIFY_AGENT_KEY
     if os.environ.get("DB_URL"):
         DB_URL = os.environ["DB_URL"]
     if os.environ.get("JWT_SECRET"):
         JWT_SECRET = os.environ["JWT_SECRET"]
+    if os.environ.get("DIFY_BASE_URL"):
+        DIFY_BASE_URL = os.environ["DIFY_BASE_URL"]
+    if os.environ.get("DIFY_AGENT_KEY"):
+        DIFY_AGENT_KEY = os.environ["DIFY_AGENT_KEY"]
 
 
 _load_env_file()

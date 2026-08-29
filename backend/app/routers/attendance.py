@@ -1,11 +1,13 @@
 from datetime import datetime, date, timedelta
 
+import httpx
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import WORK_START
+from ..config import DIFY_AGENT_KEY, DIFY_BASE_URL, WORK_START
 from ..database import get_db
 from ..models import Attendance, Employee
 from ..security import get_current_user, require_manager
@@ -168,8 +170,54 @@ def my_attendance(period: str = Query(..., pattern="^(week|month)$"),
 async def attendance_ask(body: AskIn,
                          user: Employee = Depends(get_current_user),
                          db: Session = Depends(get_db)):
-    """考勤智能问答（悬浮气泡入口）：后端从 MySQL 统计数字 → 本地模板生成回答。"""
+    """悬浮气泡入口：统一智能体（Dify Agent），集合所有工作流。"""
     q = (body.question or "").strip() or "这个月我的考勤情况"
+
+    # 有 Key → 调 Dify 统一智能体（Agent 只支持 streaming 模式）
+    if DIFY_AGENT_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                async with client.stream(
+                    "POST",
+                    f"{DIFY_BASE_URL.rstrip('/')}/chat-messages",
+                    headers={
+                        "Authorization": f"Bearer {DIFY_AGENT_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "query": q,
+                        "response_mode": "streaming",
+                        "user": str(user.emp_id),
+                        "inputs": {"emp_id": str(user.emp_id), "emp_name": user.name},
+                    },
+                ) as resp:
+                    resp.raise_for_status()
+                    parts = []
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data: "):
+                            data = line[6:]
+                            if data == "[DONE]":
+                                break
+                            try:
+                                import json
+                                chunk = json.loads(data)
+                                content = (chunk.get("answer") or "")
+                                if content:
+                                    parts.append(content)
+                            except (json.JSONDecodeError, KeyError):
+                                continue
+            answer = "".join(parts) or "智能体未返回内容"
+            return {"answer": answer, "ai": True}
+        except Exception as e:
+            # Dify 不可用时降级到本地兜底
+            return {"answer": _local_fallback(q, user, db), "ai": False}
+
+    # 无 Key → 纯本地
+    return {"answer": _local_fallback(q, user, db), "ai": False}
+
+
+def _local_fallback(q: str, user: Employee, db: Session) -> str:
+    """Dify 不可用时的本地兜底回答（仅考勤统计）。"""
     period = "week" if any(w in q for w in ("本周", "这周", "这星期", "周考勤")) else "month"
     start = _period_start(period)
     rows = db.scalars(select(Attendance).where(
@@ -199,22 +247,7 @@ async def attendance_ask(body: AskIn,
         parts.append("迟到次数偏多，建议优化通勤安排哦。")
     else:
         parts.append("偶有迟到，注意按时到岗。")
-    answer = "，".join(p for p in parts if p) + "。"
-
-    stats = {
-        "period": period,
-        "period_label": f"{date.today():%Y年%m月}" if period == "month"
-        else f"{date.today():%Y年%m月%d日} 起的本周",
-        "employee_name": user.name,
-        "days": days,
-        "record_count": len(rows),
-        "late_count": late_count,
-        "avg_clock_in": avg_clock_in,
-        "earliest": times[0] if times else "",
-        "latest": times[-1] if times else "",
-        "work_start": WORK_START,
-    }
-    return {"answer": answer, "ai": False, "stats": stats}
+    return "，".join(p for p in parts if p) + "。"
 
 
 class CommandIn(BaseModel):
