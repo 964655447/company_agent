@@ -192,7 +192,7 @@ function switchView(id) {
     admin: () => loadAdminTab(currentAdminTab()), roster: loadRoster,
   };
   if (loaders[id]) loaders[id]();
-  if (id === "chat") $("#chat-input").focus();
+  if (id === "chat") { const ci = $("#chat-input"); if (ci) ci.focus(); }
 }
 
 async function loadAIStatus() {
@@ -346,7 +346,8 @@ $("#assess-form").addEventListener("submit", async (e) => {
 });
 
 /* ---------------- 智能助手 ---------------- */
-$("#chat-form").addEventListener("submit", async (e) => {
+const chatForm = $("#chat-form");
+if (chatForm) chatForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $("#chat-input");
   const text = input.value.trim();

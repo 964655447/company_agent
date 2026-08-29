@@ -517,7 +517,7 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 
 /* ================= 悬浮考勤小助手 ================= */
 .float-bubble {
-  position: fixed; right: 26px; bottom: 26px; z-index: 900;
+  position: fixed; right: 26px; bottom: 26px; z-index: 99999;
   width: 58px; height: 58px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: #fff; cursor: pointer; border: none;
@@ -542,7 +542,7 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 @keyframes dotBlink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
 .float-panel {
-  position: fixed; right: 26px; bottom: 98px; z-index: 901;
+  position: fixed; right: 26px; bottom: 98px; z-index: 100000;
   width: 330px; max-width: calc(100vw - 32px);
   background: #fff; border-radius: 18px;
   border: 1px solid rgba(17, 24, 39, .07);
