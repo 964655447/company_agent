@@ -82,11 +82,39 @@ def _resolve_python():
                 return c
         except Exception:
             pass
-    # 全部失败：退回启动器自身 python，并在 stderr 打显眼警告（便于用户排查）
+    # 全部失败：退回启动器自身 python，并尝试自动安装依赖
+    fallback = sys.executable
     sys.stderr.write(
         "\n[启动器] 警告：未找到带 uvicorn/sqlalchemy/pymysql/fastapi 的 Python，"
-        "后端可能无法启动。请安装依赖或用 COMPANY_PYTHON 指定正确的 python。\n")
-    return sys.executable
+        "将尝试自动安装依赖到当前 Python 环境。\n"
+        "若安装失败，请手动执行：pip install -r backend/requirements.txt\n")
+    _auto_install_deps(fallback)
+    return fallback
+
+
+def _auto_install_deps(python: str):
+    """自动安装后端依赖（幂等，已装则秒过）。"""
+    req_file = BACKEND_DIR / "requirements.txt"
+    if not req_file.exists():
+        sys.stderr.write(f"[启动器] 未找到 {req_file}，跳过自动安装。\n")
+        return
+    sys.stderr.write(f"[启动器] 正在为 {python} 安装项目依赖（首次可能需要 1-2 分钟）…\n")
+    try:
+        r = subprocess.run(
+            [python, "-m", "pip", "install", "-r", str(req_file), "-q"],
+            capture_output=True, text=True, timeout=300,
+        )
+        if r.returncode == 0:
+            sys.stderr.write("[启动器] 依赖安装完成 ✓\n")
+        else:
+            err_tail = (r.stderr or r.stdout or "").strip()[-300:]
+            sys.stderr.write(
+                f"[启动器] 依赖安装失败（exit {r.returncode}）：{err_tail}\n"
+                f"请手动在终端执行：{python} -m pip install -r {req_file}\n")
+    except subprocess.TimeoutExpired:
+        sys.stderr.write("[启动器] 依赖安装超时（>5分钟），请检查网络或手动安装。\n")
+    except Exception as e:
+        sys.stderr.write(f"[启动器] 依赖安装异常：{e}\n")
 
 PYTHON = _resolve_python()
 BACKEND_ENV = BACKEND_DIR / ".env"
