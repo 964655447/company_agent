@@ -246,8 +246,8 @@ workflow:
           template: null
           type: select
         - auto_generate: null
-          default: localhost
-          form: llm
+          default: host.docker.internal
+          form: constant
           human_description:
             en_US: Database hostname or IP address (Original string, not URL-encoded
               string).
@@ -302,7 +302,7 @@ workflow:
           type: number
         - auto_generate: null
           default: null
-          form: llm
+          form: constant
           human_description:
             en_US: Database username (Original string, not URL-encoded string).
             ja_JP: Database username (Original string, not URL-encoded string).
@@ -328,7 +328,7 @@ workflow:
           type: string
         - auto_generate: null
           default: null
-          form: llm
+          form: constant
           human_description:
             en_US: Database password (Original string, not URL-encoded string).
             ja_JP: Database password (Original string, not URL-encoded string).
@@ -354,7 +354,7 @@ workflow:
           type: secret-input
         - auto_generate: null
           default: null
-          form: llm
+          form: constant
           human_description:
             en_US: Database name (Original string, not URL-encoded string).
             ja_JP: Database name (Original string, not URL-encoded string).
@@ -380,7 +380,7 @@ workflow:
           type: string
         - auto_generate: null
           default: null
-          form: llm
+          form: constant
           human_description:
             en_US: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
             ja_JP: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
@@ -503,25 +503,25 @@ workflow:
         tool_node_version: '2'
         tool_parameters:
           db_host:
-            type: mixed
+            type: constant
             value: host.docker.internal
           db_name:
-            type: mixed
+            type: constant
             value: company_agent
           db_password:
-            type: mixed
+            type: constant
             value: '{{#env.password#}}'
           db_port:
             type: constant
             value: 3306
           db_properties:
-            type: mixed
+            type: constant
             value: ''
           db_type:
             type: constant
             value: mysql
           db_username:
-            type: mixed
+            type: constant
             value: root
           query_sql:
             type: mixed
@@ -610,8 +610,8 @@ workflow:
           template: null
           type: select
         - auto_generate: null
-          default: localhost
-          form: llm
+          default: host.docker.internal
+          form: constant
           human_description:
             en_US: Database hostname or IP address (Original string, not URL-encoded
               string).
@@ -666,7 +666,7 @@ workflow:
           type: number
         - auto_generate: null
           default: null
-          form: llm
+          form: constant
           human_description:
             en_US: Database username (Original string, not URL-encoded string).
             ja_JP: Database username (Original string, not URL-encoded string).
@@ -692,7 +692,7 @@ workflow:
           type: string
         - auto_generate: null
           default: null
-          form: llm
+          form: constant
           human_description:
             en_US: Database password (Original string, not URL-encoded string).
             ja_JP: Database password (Original string, not URL-encoded string).
@@ -718,7 +718,7 @@ workflow:
           type: secret-input
         - auto_generate: null
           default: null
-          form: llm
+          form: constant
           human_description:
             en_US: Database name (Original string, not URL-encoded string).
             ja_JP: Database name (Original string, not URL-encoded string).
@@ -744,7 +744,7 @@ workflow:
           type: string
         - auto_generate: null
           default: null
-          form: llm
+          form: constant
           human_description:
             en_US: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
             ja_JP: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
@@ -864,25 +864,25 @@ workflow:
         tool_node_version: '2'
         tool_parameters:
           db_host:
-            type: mixed
+            type: constant
             value: host.docker.internal
           db_name:
-            type: mixed
+            type: constant
             value: company_agent
           db_password:
-            type: mixed
+            type: constant
             value: '{{#env.password#}}'
           db_port:
             type: constant
             value: 3306
           db_properties:
-            type: mixed
+            type: constant
             value: null
           db_type:
             type: constant
             value: mysql
           db_username:
-            type: mixed
+            type: constant
             value: root
           query_sql:
             type: mixed
