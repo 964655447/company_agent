@@ -1,4 +1,5 @@
 import json
+import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -6,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..dify_client import wf5_analysis
+from ..dify_client import wf5_analysis, wf_reimb_report
 from ..models import Employee, Reimbursement
 
 router = APIRouter(prefix="/api/reimbursement", tags=["费用报销"])
@@ -112,8 +113,10 @@ async def reimbursement_report(db: Session = Depends(get_db)):
         "total_amount": sum(amounts),
         "max_amount": max(amounts) if amounts else 0,
     }
-    analysis = await wf5_analysis("reimbursement", f"{__import__('datetime').date.today():%Y-%m}",
-                                 stats, "")
+    period = f"{datetime.date.today():%Y-%m}"
+    analysis = await wf_reimb_report("all", period, "")
+    if not analysis:
+        analysis = await wf5_analysis("reimbursement", period, stats, "")
     return {
         "rows": [{**r.to_dict(), "employee_name": visible_ids[r.employee_id].name if r.employee_id in visible_ids else ""}
                  for r in rows],

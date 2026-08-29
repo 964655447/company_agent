@@ -41,6 +41,7 @@ DIFY_KEY_WF2 = os.environ.get("DIFY_KEY_WF2", "")          # 报销 OCR 抽取
 DIFY_KEY_WF3 = os.environ.get("DIFY_KEY_WF3", "")          # 绩效抽取与工资计算
 DIFY_KEY_WF4 = os.environ.get("DIFY_KEY_WF4", "")          # 岗位知识 RAG
 DIFY_KEY_WF5 = os.environ.get("DIFY_KEY_WF5", "")          # 分析报告生成
+DIFY_KEY_REIMB = os.environ.get("DIFY_KEY_REIMB", "")      # 用户自建「报销费用管理端」工作流（管理员报销 AI 分析）
 DIFY_TIMEOUT = float(os.environ.get("DIFY_TIMEOUT", "60"))
 
 # ---------- 种子数据 ----------
@@ -64,7 +65,7 @@ def _load_env_file() -> None:
             os.environ[k] = v
     # 重读一次让上面的默认值拿到 .env 内容
     global DB_URL, DIFY_BASE_URL, JWT_SECRET
-    global DIFY_KEY_WF1, DIFY_KEY_WF2, DIFY_KEY_WF3, DIFY_KEY_WF4, DIFY_KEY_WF5
+    global DIFY_KEY_WF1, DIFY_KEY_WF2, DIFY_KEY_WF3, DIFY_KEY_WF4, DIFY_KEY_WF5, DIFY_KEY_REIMB
     if os.environ.get("DB_URL"):
         DB_URL = os.environ["DB_URL"]
     if os.environ.get("DIFY_BASE_URL"):
@@ -76,6 +77,7 @@ def _load_env_file() -> None:
     DIFY_KEY_WF3 = os.environ.get("DIFY_KEY_WF3", DIFY_KEY_WF3)
     DIFY_KEY_WF4 = os.environ.get("DIFY_KEY_WF4", DIFY_KEY_WF4)
     DIFY_KEY_WF5 = os.environ.get("DIFY_KEY_WF5", DIFY_KEY_WF5)
+    DIFY_KEY_REIMB = os.environ.get("DIFY_KEY_REIMB", DIFY_KEY_REIMB)
 
 
 _load_env_file()

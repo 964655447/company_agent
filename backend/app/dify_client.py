@@ -217,6 +217,28 @@ async def wf5_analysis(report_type: str, period: str, stats: dict, user: str) ->
 
 
 # ============================================================
+# 用户自建「报销费用管理端」工作流（管理员报销 AI 分析）
+# ============================================================
+async def wf_reimb_report(emp_id: str, period: str, user: str) -> str:
+    """调用用户自建「报销费用管理端」工作流，返回 AI 分析文案。
+
+    输入变量：id（员工工号或 'all'）、time（周期，如 2026-08）。
+    后端取 outputs 中第一个非空字符串值作为分析返回；未配置 Key / 调用失败返回空串，
+    由调用方降级到本地 wf5_fallback 文案。
+    """
+    try:
+        out = await run_workflow(config.DIFY_KEY_REIMB, {"id": emp_id, "time": period}, user)
+        for v in out.values():
+            if isinstance(v, str) and v.strip():
+                return v
+    except DifyNotConfigured:
+        pass
+    except Exception:
+        pass
+    return ""
+
+
+# ============================================================
 # 考勤类工作流（WF-6 考勤问答 / WF-7 员工打卡 / WF-8 管理端分析）
 # 已于 2026-08-28 撤销：对应 Dify 工作流已删除，相关接口改为纯本地实现
 # （见 routers/attendance.py 的 /ask、/command、/report）。
