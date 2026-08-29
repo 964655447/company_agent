@@ -1,4 +1,6 @@
 """智能助手对话入口 —— 统一由 Dify Agent 承接（attendance_ask 入口）。"""
+from fastapi import APIRouter, Depends
+
 from ..config import DIFY_AGENT_KEY
 from ..security import get_current_user
 
