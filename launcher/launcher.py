@@ -428,7 +428,7 @@ def start_backend() -> dict:
         try:
             backend_proc = subprocess.Popen(
                 [PYTHON, "-m", "uvicorn", "app.main:app",
-                 "--host", "127.0.0.1", "--port", str(BACKEND_PORT)],
+                 "--host", "0.0.0.0", "--port", str(BACKEND_PORT)],
                 cwd=BACKEND_DIR,
                 stdout=logf,
                 stderr=subprocess.STDOUT,
