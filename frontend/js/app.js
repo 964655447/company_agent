@@ -198,11 +198,12 @@ function switchView(id) {
 async function loadAIStatus() {
   try {
     const { dify } = await api("/api/chat/status");
-    const on = dify && dify.wf1 && dify.wf3 && dify.wf4 && dify.wf5;
     const el = $("#ai-status");
+    const on = !!(dify && dify.enabled);
     el.className = "ai-status" + (on ? " on" : "");
-    const cnt = ["wf1", "wf2", "wf3", "wf4", "wf5", "wf6"].filter((k) => dify[k]).length;
-    el.textContent = on ? "AI 大脑已接入（Dify）" : `AI 大脑：Dify ${cnt}/6 工作流接入中，未接功能走本地规则`;
+    el.textContent = on
+      ? "AI 大脑已接入（统一智能体）"
+      : "AI 分析已整合至右下角「智能助手」，统一智能体接入中";
   } catch (e) { /* ignore */ }
 }
 
@@ -438,7 +439,7 @@ async function loadAdminAttendance() {
       statCard("考勤记录", r.stats.record_count, "人次") +
       statCard("迟到人次", `<span style="color:${r.stats.late_count ? "var(--danger)" : "var(--ok)"}">${r.stats.late_count}</span>`) +
       statCard("迟到最多", r.stats.late_top_str || "无");
-    $("#admin-att-analysis").innerHTML = `<div class="ana-title">🤖 AI 行为分析</div><div class="ana-body">${esc(r.analysis || "")}</div>`;
+    $("#admin-att-analysis").innerHTML = '<div class="ana-title">🤖 AI 行为分析</div><div class="ana-body">已整合至右下角「智能助手」，去那里问我吧</div>';
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
       <tr><td>${esc(row.employee_name)}</td><td>${esc(row.work_date)}</td>
       <td>${row.type === "clock_in" ? "上班" : "下班"}</td><td>${fmtTime(row.checkin_time)}</td>
@@ -456,7 +457,7 @@ async function loadAdminReimb() {
       statCard("待审批", `<span style="color:${r.stats.pending_count ? "var(--warn)" : "var(--ok)"}">${r.stats.pending_count}</span>`) +
       statCard("合计金额", money(r.stats.total_amount), "元") +
       statCard("单笔最高", money(r.stats.max_amount), "元");
-    $("#admin-reimb-analysis").innerHTML = `<div class="ana-title">🤖 AI 异常分析</div><div class="ana-body">${esc(r.analysis || "")}</div>`;
+    $("#admin-reimb-analysis").innerHTML = '<div class="ana-title">🤖 AI 异常分析</div><div class="ana-body">已整合至右下角「智能助手」，去那里问我吧</div>';
     const tbody = (r.rows || []).length ? r.rows.map((row) => {
       const [txt, cls] = REIMB_STATUS[row.status] || [row.status, "tag-gray"];
       const act = ["submitted", "approving"].includes(row.status)
@@ -493,7 +494,7 @@ async function loadAdminSalary() {
       statCard("工资条数", r.stats.slip_count) +
       statCard("工资总额", money(r.stats.total_payroll), "元") +
       statCard("平均工资", money(r.stats.avg_pay), "元");
-    $("#admin-salary-analysis").innerHTML = `<div class="ana-title">🤖 AI 稳定性分析</div><div class="ana-body">${esc(r.analysis || "")}</div>`;
+    $("#admin-salary-analysis").innerHTML = '<div class="ana-title">🤖 AI 稳定性分析</div><div class="ana-body">已整合至右下角「智能助手」，去那里问我吧</div>';
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
       <tr data-id="${esc(row.id)}">
         <td>${esc(row.no)}</td><td>${esc(row.id)}</td><td>${esc(row.name)}</td><td>${esc(row.position || "")}</td>

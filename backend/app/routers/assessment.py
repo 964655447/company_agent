@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..dify_client import wf4_position
+from ..local_rules import wf4_fallback
 from ..models import AssessmentLog, Employee
 from ..security import get_current_user, require_manager
 
@@ -22,7 +22,7 @@ async def query_position(body: QueryIn,
     position = body.position.strip()
     if not position:
         return {"intro": "请输入想了解的岗位名称"}
-    result = await wf4_position(position, user.name, str(user.emp_id))
+    result = wf4_fallback(position)
     db.add(AssessmentLog(employee_id=user.id, position_queried=position))
     db.commit()
     return result

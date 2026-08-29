@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..config import WORK_START
 from ..database import get_db
-from ..dify_client import wf1_intent, dify_status
+from ..local_rules import wf1_fallback
 from ..models import Attendance, Employee, Reimbursement, Salary
 from ..security import get_current_user
 
@@ -81,7 +81,7 @@ def _reply_assessment(user, db, params) -> str:
 @router.post("")
 async def chat(body: ChatIn, user: Employee = Depends(get_current_user),
                db: Session = Depends(get_db)):
-    intent = await wf1_intent(body.message, str(user.emp_id))
+    intent = wf1_fallback(body.message)
     module, action, params = intent.get("module", "chat"), intent.get("action", "reply"), intent.get("params", {})
 
     if module == "attendance":
@@ -100,5 +100,6 @@ async def chat(body: ChatIn, user: Employee = Depends(get_current_user),
 
 @router.get("/status")
 def ai_status(user: Employee = Depends(get_current_user)):
-    """AI 大脑接入状态（前端展示用）。"""
-    return {"dify": dify_status()}
+    """AI 能力接入状态（前端展示用）。"""
+    return {"dify": {"enabled": False,
+                     "note": "AI 分析已整合至右下角「智能助手」，统一智能体接入中"}}

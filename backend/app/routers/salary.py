@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..config import BASE_SALARY_MAP, BASE_SALARY_DEFAULT, SUBSIDY_DEFAULT
 from ..database import get_db
-from ..dify_client import wf3_performance, wf5_analysis
+from ..local_rules import wf3_fallback
 from ..models import Employee, Salary
 from ..security import get_current_user, require_manager
 
@@ -43,12 +43,8 @@ async def submit_performance(body: PerformanceIn,
                              db: Session = Depends(get_db)):
     if not body.achievements.strip():
         return {"error": "achievements 不能为空"}
-    # WF-3：AI 抽取绩效（未接入时走本地规则）
-    result = await wf3_performance(
-        {"emp_id": user.emp_id, "name": user.name,
-         "position": user.position, "department": user.department},
-        body.achievements, str(user.emp_id),
-    )
+    # 绩效本地规则打分（AI 能力已整合至右下角「智能助手」，统一智能体接入中）
+    result = wf3_fallback(body.achievements)
     score = float(result.get("performance_score", 60))
     base_salary = float(BASE_SALARY_MAP.get(user.position, BASE_SALARY_DEFAULT))
     factor = _score_to_factor(score)
@@ -141,9 +137,7 @@ async def salary_report(manager: Employee = Depends(require_manager),
         "total_payroll": sum(totals),
         "avg_pay": sum(totals) / len(totals) if totals else 0,
     }
-    analysis = await wf5_analysis("salary", f"{date.today():%Y-%m}", stats, str(manager.emp_id))
     return {
         "rows": [{**r.to_dict(), "employee_name": r.name} for r in rows],
         "stats": stats,
-        "analysis": analysis,
     }

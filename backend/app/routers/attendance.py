@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from ..config import WORK_START
 from ..database import get_db
-from ..dify_client import wf5_analysis
 from ..models import Attendance, Employee
 from ..security import get_current_user, require_manager
 
@@ -358,15 +357,11 @@ async def attendance_report(period: str = Query("week", pattern="^(week|month)$"
         "late_top": [{"name": name_map.get(i, str(i)), "count": c} for i, c in late_top],
         "late_top_str": late_top_str,
     }
-    # 管理端考勤分析：本地 WF-5 模板分析（数字全部由后端统计传入，AI 仅做文案解读）。
-    analysis = await wf5_analysis("attendance", f"{date.today():%Y-%m}", stats,
-                                  str(manager.emp_id))
     return {
         "period": period,
         "range_start": str(start),
         "rows": [{**r.to_dict(), "employee_name": name_map.get(r.employee_id, "")} for r in rows],
         "stats": stats,
-        "analysis": analysis,
     }
 
 
