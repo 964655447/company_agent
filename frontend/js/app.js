@@ -422,7 +422,6 @@ async function loadAdminAttendance() {
       statCard("考勤记录", r.stats.record_count, "人次") +
       statCard("迟到人次", `<span style="color:${r.stats.late_count ? "var(--danger)" : "var(--ok)"}">${r.stats.late_count}</span>`) +
       statCard("迟到最多", r.stats.late_top_str || "无");
-    $("#admin-att-analysis").innerHTML = "";
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
       <tr><td>${esc(row.employee_name)}</td><td>${esc(row.work_date)}</td>
       <td>${row.type === "clock_in" ? "上班" : "下班"}</td><td>${fmtTime(row.checkin_time)}</td>
@@ -440,7 +439,6 @@ async function loadAdminReimb() {
       statCard("待审批", `<span style="color:${r.stats.pending_count ? "var(--warn)" : "var(--ok)"}">${r.stats.pending_count}</span>`) +
       statCard("合计金额", money(r.stats.total_amount), "元") +
       statCard("单笔最高", money(r.stats.max_amount), "元");
-    $("#admin-reimb-analysis").innerHTML = "";
     const tbody = (r.rows || []).length ? r.rows.map((row) => {
       const [txt, cls] = REIMB_STATUS[row.status] || [row.status, "tag-gray"];
       const act = ["submitted", "approving"].includes(row.status)
@@ -477,7 +475,7 @@ async function loadAdminSalary() {
       statCard("工资条数", r.stats.slip_count) +
       statCard("工资总额", money(r.stats.total_payroll), "元") +
       statCard("平均工资", money(r.stats.avg_pay), "元");
-    $("#admin-salary-analysis").innerHTML = "";
+    // (removed: #admin-salary-analysis element not in HTML)
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
       <tr data-id="${esc(row.id)}">
         <td>${esc(row.no)}</td><td>${esc(row.id)}</td><td>${esc(row.name)}</td><td>${esc(row.position || "")}</td>

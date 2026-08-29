@@ -1,0 +1,205 @@
+app:
+  description: |-
+    WF-C 管理端考勤月报（只读，直连 MySQL）。
+    输入统计周期与可选部门，工作流用 database 插件聚合全员考勤、迟到排行，
+    由 LLM 生成管理端分析报告。数字全部来自 MySQL，LLM 仅做文案解读。
+  icon: "\U0001F4CB"
+  icon_background: '#3370FF'
+  mode: workflow
+  name: WF-C 管理端考勤月报
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - data:
+          isInIteration: false
+          sourceType: start
+          targetType: tool
+        id: edge-start-rows
+        source: node_start
+        sourceHandle: source
+        target: node_rows
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: tool
+          targetType: tool
+        id: edge-rows-late
+        source: node_rows
+        sourceHandle: source
+        target: node_late
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: tool
+          targetType: llm
+        id: edge-late-llm
+        source: node_late
+        sourceHandle: source
+        target: node_llm
+        targetHandle: target
+        type: custom
+      - data:
+          isInIteration: false
+          sourceType: llm
+          targetType: end
+        id: edge-llm-end
+        source: node_llm
+        sourceHandle: source
+        target: node_end
+        targetHandle: target
+        type: custom
+    nodes:
+      - data:
+          desc: 统计周期与部门
+          selected: false
+          title: 开始
+          type: start
+          variables:
+            - label: 统计周期(week/month)
+              max_length: 8
+              options: []
+              required: true
+              type: text-input
+              variable: period
+            - label: 部门（可空）
+              max_length: 32
+              options: []
+              required: false
+              type: text-input
+              variable: dept
+        id: node_start
+        position:
+          x: 80
+          y: 300
+        positionAbsolute:
+          x: 80
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 150
+      - data:
+          desc: 查询区间考勤明细
+          provider_name: hjlarry/database
+          tool_name: sql_execute
+          tool_label: SQL Execute
+          tool_parameters:
+            query: "SELECT e.name, e.department, a.work_date, a.type, a.is_late FROM attendance a JOIN employees e ON e.id=a.employee_id WHERE a.work_date >= CASE WHEN '{{#node_start.period#}}'='week' THEN DATE_SUB(CURDATE(),INTERVAL WEEKDAY(CURDATE()) DAY) ELSE DATE_SUB(CURDATE(),INTERVAL DAY(CURDATE())-1 DAY) END AND a.work_date <= CURDATE() AND (e.department='{{#node_start.dept#}}' OR '{{#node_start.dept#}}'='');"
+            format: json
+          title: 考勤明细
+          type: tool
+        id: node_rows
+        position:
+          x: 400
+          y: 300
+        positionAbsolute:
+          x: 400
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 112
+      - data:
+          desc: 迟到排行聚合
+          provider_name: hjlarry/database
+          tool_name: sql_execute
+          tool_label: SQL Execute
+          tool_parameters:
+            query: "SELECT e.name, COUNT(*) AS late_times FROM attendance a JOIN employees e ON e.id=a.employee_id WHERE a.is_late=1 AND a.work_date >= CASE WHEN '{{#node_start.period#}}'='week' THEN DATE_SUB(CURDATE(),INTERVAL WEEKDAY(CURDATE()) DAY) ELSE DATE_SUB(CURDATE(),INTERVAL DAY(CURDATE())-1 DAY) END AND a.work_date <= CURDATE() AND (e.department='{{#node_start.dept#}}' OR '{{#node_start.dept#}}'='') GROUP BY e.name ORDER BY late_times DESC LIMIT 5;"
+            format: json
+          title: 迟到排行
+          type: tool
+        id: node_late
+        position:
+          x: 700
+          y: 300
+        positionAbsolute:
+          x: 700
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 112
+      - data:
+          desc: 生成管理端分析报告
+          model:
+            completion_params:
+              temperature: 0.7
+            mode: chat
+            name: qwen3.5:4b
+            provider: langgenius/ollama/ollama
+          prompt_template:
+            - role: system
+              text: "你是 HR 数据分析师。根据数据库返回的考勤明细与迟到排行，生成简洁的管理端考勤分析报告，指出迟到重点关注对象与改进建议。不要编造数字。"
+            - role: user
+              text: "统计周期：{{#node_start.period#}}，部门：{{#node_start.dept#}}（空表示全部）\n考勤明细：{{#node_rows.json#}}\n迟到排行：{{#node_late.json#}}\n请生成报告。"
+          title: 生成报告
+          type: llm
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+        id: node_llm
+        position:
+          x: 1020
+          y: 300
+        positionAbsolute:
+          x: 1020
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 150
+      - data:
+          desc: 输出报告
+          outputs:
+            - value_selector:
+                - node_llm
+                - text
+              variable: result
+          title: 结束
+          type: end
+        id: node_end
+        position:
+          x: 1320
+          y: 300
+        positionAbsolute:
+          x: 1320
+          y: 300
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        height: 112

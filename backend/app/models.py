@@ -73,6 +73,7 @@ class Reimbursement(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     employee_id = Column(Integer, nullable=False)
+    applicant_name = Column(String(64), nullable=False, default="")  # 申请人名称（冗余存储，去外键后保留）
     category = Column(String(64), nullable=False, default="")
     amount = Column(Float, nullable=False, default=0)
     ocr_raw = Column(Text, nullable=True)
@@ -83,7 +84,8 @@ class Reimbursement(Base):
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id, "employee_id": self.employee_id, "category": self.category,
+            "id": self.id, "employee_id": self.employee_id,
+            "applicant_name": self.applicant_name, "category": self.category,
             "amount": round(self.amount, 2), "status": self.status,
             "approver_id": self.approver_id,
             "submit_time": self.submit_time.isoformat(),
