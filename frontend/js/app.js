@@ -202,8 +202,8 @@ async function loadAIStatus() {
     const on = !!(dify && dify.enabled);
     el.className = "ai-status" + (on ? " on" : "");
     el.textContent = on
-      ? "AI 大脑已接入（统一智能体）"
-      : "AI 分析已整合至右下角「智能助手」，统一智能体接入中";
+      ? "智能助手已接入"
+      : "智能助手接入中";
   } catch (e) { /* ignore */ }
 }
 
@@ -290,23 +290,6 @@ async function loadMyReimb() {
 }
 
 /* ---------------- 工资 ---------------- */
-$("#perf-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const msgEl = $("#perf-msg");
-  const btn = $("#perf-form button[type=submit]");
-  const text = $("#perf-input").value.trim();
-  if (!text) return setMsg(msgEl, "请先填写绩效达成情况", "err");
-  setMsg(msgEl, "AI 评估中…");
-  loading(btn, true, "AI 评估中…");
-  try {
-    const r = await api("/api/salary/submit-performance", { method: "POST", json: { achievements: text } });
-    if (r.error) return setMsg(msgEl, r.error, "err");
-    setMsg(msgEl, "工资条已生成", "ok");
-    renderSlip(r);
-    loadMySalary();
-  } catch (err) { setMsg(msgEl, err.message, "err"); }
-  finally { loading(btn, false); }
-});
 
 function renderSlip(r) {
   $("#salary-result").innerHTML = `
@@ -439,7 +422,7 @@ async function loadAdminAttendance() {
       statCard("考勤记录", r.stats.record_count, "人次") +
       statCard("迟到人次", `<span style="color:${r.stats.late_count ? "var(--danger)" : "var(--ok)"}">${r.stats.late_count}</span>`) +
       statCard("迟到最多", r.stats.late_top_str || "无");
-    $("#admin-att-analysis").innerHTML = '<div class="ana-title">🤖 AI 行为分析</div><div class="ana-body">已整合至右下角「智能助手」，去那里问我吧</div>';
+    $("#admin-att-analysis").innerHTML = "";
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
       <tr><td>${esc(row.employee_name)}</td><td>${esc(row.work_date)}</td>
       <td>${row.type === "clock_in" ? "上班" : "下班"}</td><td>${fmtTime(row.checkin_time)}</td>
@@ -457,7 +440,7 @@ async function loadAdminReimb() {
       statCard("待审批", `<span style="color:${r.stats.pending_count ? "var(--warn)" : "var(--ok)"}">${r.stats.pending_count}</span>`) +
       statCard("合计金额", money(r.stats.total_amount), "元") +
       statCard("单笔最高", money(r.stats.max_amount), "元");
-    $("#admin-reimb-analysis").innerHTML = '<div class="ana-title">🤖 AI 异常分析</div><div class="ana-body">已整合至右下角「智能助手」，去那里问我吧</div>';
+    $("#admin-reimb-analysis").innerHTML = "";
     const tbody = (r.rows || []).length ? r.rows.map((row) => {
       const [txt, cls] = REIMB_STATUS[row.status] || [row.status, "tag-gray"];
       const act = ["submitted", "approving"].includes(row.status)
@@ -494,7 +477,7 @@ async function loadAdminSalary() {
       statCard("工资条数", r.stats.slip_count) +
       statCard("工资总额", money(r.stats.total_payroll), "元") +
       statCard("平均工资", money(r.stats.avg_pay), "元");
-    $("#admin-salary-analysis").innerHTML = '<div class="ana-title">🤖 AI 稳定性分析</div><div class="ana-body">已整合至右下角「智能助手」，去那里问我吧</div>';
+    $("#admin-salary-analysis").innerHTML = "";
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
       <tr data-id="${esc(row.id)}">
         <td>${esc(row.no)}</td><td>${esc(row.id)}</td><td>${esc(row.name)}</td><td>${esc(row.position || "")}</td>
@@ -683,11 +666,11 @@ function floatTogglePanel(show) {
   }
 }
 
-function appendFloatMsg(role, text, aiTag) {
+function appendFloatMsg(role, text) {
   const log = $("#float-log");
   const el = document.createElement("div");
   el.className = "float-msg " + role;
-  el.innerHTML = ((role === "bot" && aiTag) ? '<span class="float-ai-tag">' + esc(aiTag) + "</span><br>" : "") + esc(text);
+  el.innerHTML = esc(text);
   log.appendChild(el);
   log.scrollTop = log.scrollHeight;
   return el;
@@ -711,7 +694,7 @@ async function askAttendance(question) {
   sendBtn.disabled = true;
   try {
     const r = await api("/api/attendance/ask", { method: "POST", json: { question: question } });
-    typing.innerHTML = (r.ai ? '<span class="float-ai-tag">Dify AI</span><br>' : "") + esc(r.answer);
+    typing.innerHTML = esc(r.answer);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
   } finally {
