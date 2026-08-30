@@ -5,7 +5,13 @@ const API = (location.protocol === "file:") ? "http://127.0.0.1:8000" : "";
 const TOKEN_KEY = "cm_token", USER_KEY = "cm_user";
 
 const $ = (sel) => document.querySelector(sel);
-const state = { user: null, rosterEditing: null, attPeriod: "week", adminAttPeriod: "week" };
+const state = { user: null, rosterEditing: null, attPeriod: "week", adminAttPeriod: "week",
+                floatConvId: null, chatConvId: null };
+
+/* 转义 HTML 后保留换行，便于展示多行回答 */
+function renderText(s) {
+  return esc(s).replace(/\n/g, "<br>");
+}
 
 /* ---------------- 工具 ---------------- */
 async function api(path, opts = {}) {
@@ -192,7 +198,7 @@ function switchView(id) {
     admin: () => loadAdminTab(currentAdminTab()), roster: loadRoster,
   };
   if (loaders[id]) loaders[id]();
-  if (id === "chat") { const ci = $("#chat-input"); if (ci) ci.focus(); }
+  if (id === "chat") { openChatView(); }
 }
 
 async function loadAIStatus() {
@@ -344,44 +350,6 @@ $("#assess-form").addEventListener("submit", async (e) => {
     $("#assess-result").innerHTML = `<div class="card assess-card"><p style="color:var(--danger)">${esc(err.message)}</p></div>`;
   }
 });
-
-/* ---------------- 智能助手 ---------------- */
-const chatForm = $("#chat-form");
-if (chatForm) chatForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const input = $("#chat-input");
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = "";
-  appendMsg("user", text);
-  const typing = document.createElement("div");
-  typing.className = "msg bot typing";
-  typing.innerHTML = '<span class="dots"><span></span><span></span><span></span></span>';
-  $("#chat-log").appendChild(typing);
-  $("#chat-log").scrollTop = $("#chat-log").scrollHeight;
-  try {
-    const r = await api("/api/chat", { method: "POST", json: { message: text } });
-    typing.className = "msg bot";
-    typing.textContent = r.reply;
-    const tag = typing.querySelector(".msg-tag");
-    if (r.module && r.module !== "chat") {
-      if (!tag) typing.insertAdjacentHTML("afterbegin", `<span class="msg-tag">意图：${esc(r.module)}</span>`);
-    }
-  } catch (err) {
-    typing.className = "msg bot";
-    typing.textContent = "出错了：" + err.message;
-  }
-  $("#chat-log").scrollTop = $("#chat-log").scrollHeight;
-});
-
-function appendMsg(who, text) {
-  const div = document.createElement("div");
-  div.className = `msg ${who}`;
-  div.textContent = text;
-  $("#chat-log").appendChild(div);
-  $("#chat-log").scrollTop = $("#chat-log").scrollHeight;
-  return div;
-}
 
 /* ---------------- 管理看板 ---------------- */
 function currentAdminTab() {
@@ -648,28 +616,117 @@ $("#roster-table").addEventListener("click", async (e) => {
   $("#login-page").classList.remove("hidden");
 })();
 
+/* ---------------- 智能助手（统一对话，走后端 /api/chat） ---------------- */
+const chatGreeted = { done: false };
+
+function appendChatMsg(role, html) {
+  const log = $("#chat-log");
+  const el = document.createElement("div");
+  el.className = "chat-msg " + role;
+  el.innerHTML = html;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+function appendChatTyping() {
+  const log = $("#chat-log");
+  const el = document.createElement("div");
+  el.className = "chat-msg bot";
+  el.innerHTML = '<span class="float-typing"><i></i><i></i><i></i></span>';
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+
+async function sendChat(message) {
+  if (!message || !message.trim()) return;
+  appendChatMsg("user", renderText(message.trim()));
+  const typing = appendChatTyping();
+  const btn = $("#chat-send");
+  btn.disabled = true;
+  try {
+    const r = await api("/api/chat", {
+      method: "POST",
+      json: { message: message, conversation_id: state.chatConvId },
+    });
+    if (r.conversation_id) state.chatConvId = r.conversation_id;
+    typing.innerHTML = renderText(r.reply);
+  } catch (err) {
+    typing.innerHTML = "出错了：" + esc(err.message);
+  } finally {
+    btn.disabled = false;
+    const log = $("#chat-log");
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+$("#chat-quick").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-q]");
+  if (btn) sendChat(btn.dataset.q);
+});
+$("#chat-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const v = $("#chat-input").value;
+  $("#chat-input").value = "";
+  sendChat(v);
+});
+
+function openChatView() {
+  if (!chatGreeted.done) {
+    chatGreeted.done = true;
+    const who = state.user ? state.user.name : "";
+    appendChatMsg("bot",
+      `你好${who ? "，" + esc(who) : ""}！我是公司智能助手，已知道你的身份与权限。<br>可以直接问我：考勤、报销、工资、考核相关问题，对话会一直记住上下文。`);
+  }
+  const ci = $("#chat-input");
+  if (ci) ci.focus();
+}
+
 /* ---------------- 悬浮考勤小助手 ---------------- */
 const floatGreeted = { done: false };
+
+function renderUserCard(user) {
+  if (!user) return "";
+  const roleText = user.role === "manager" ? "管理者" : "员工";
+  const idNo = (user.id !== undefined && user.id !== null) ? user.id : user.emp_id;
+  return `<div class="float-idcard">
+    <div class="float-idcard-title">当前登录身份</div>
+    <div class="float-idcard-row"><span>ID</span><b>${esc(idNo)}</b></div>
+    <div class="float-idcard-row"><span>工号</span><b>${esc(user.emp_id)}</b></div>
+    <div class="float-idcard-row"><span>姓名</span><b>${esc(user.name)}</b></div>
+    <div class="float-idcard-row"><span>部门</span><b>${esc(user.department)}</b></div>
+    <div class="float-idcard-row"><span>岗位</span><b>${esc(user.position)}</b></div>
+    <div class="float-idcard-row"><span>角色</span><b>${roleText}</b></div>
+  </div>`;
+}
 
 function floatTogglePanel(show) {
   const p = $("#float-panel");
   const open = (show !== undefined) ? show : p.classList.contains("hidden");
   p.classList.toggle("hidden", !open);
   if (open) {
+    const user = state.user;
+    if (user) {
+      $("#float-sub").textContent = `${esc(user.name)} · ${esc(user.department)} · ${esc(user.position)}`;
+    }
     if (!floatGreeted.done) {
       floatGreeted.done = true;
-      const who = state.user ? "，" + state.user.name : "";
-      appendFloatMsg("bot", "你好" + who + "！我是考勤小助手，点下方快捷问题或直接输入，比如「这个月我考勤多少天」。");
+      if (user) {
+        appendFloatMsg("bot", renderUserCard(user), true);
+        appendFloatMsg("bot", `你好，${esc(user.name)}！我是考勤小助手，已识别你的身份。点下方快捷问题或直接输入，比如「这个月我考勤多少天」。`);
+      } else {
+        appendFloatMsg("bot", "你好！我是考勤小助手，点下方快捷问题或直接输入。");
+      }
     }
     $("#float-input").focus();
   }
 }
 
-function appendFloatMsg(role, text) {
+function appendFloatMsg(role, text, isHtml = false) {
   const log = $("#float-log");
   const el = document.createElement("div");
   el.className = "float-msg " + role;
-  el.innerHTML = esc(text);
+  el.innerHTML = isHtml ? text : esc(text);
   log.appendChild(el);
   log.scrollTop = log.scrollHeight;
   return el;
@@ -692,8 +749,12 @@ async function askAttendance(question) {
   const sendBtn = $("#float-send");
   sendBtn.disabled = true;
   try {
-    const r = await api("/api/attendance/ask", { method: "POST", json: { question: question } });
-    typing.innerHTML = esc(r.answer);
+    const r = await api("/api/attendance/ask", {
+      method: "POST",
+      json: { question: question, conversation_id: state.floatConvId },
+    });
+    if (r.conversation_id) state.floatConvId = r.conversation_id;
+    typing.innerHTML = renderText(r.answer);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
   } finally {

@@ -353,7 +353,7 @@ def _parse_db_url(url: str) -> dict:
 
 
 def write_env_from_form(form: dict) -> str:
-    """根据表单生成 backend/.env（基于 .env.example 模板，替换 DB_URL 与 DIFY_KEY_WF6）。
+    """根据表单生成 backend/.env（基于 .env.example 模板，替换 DB_URL 与 DIFY_AGENT_KEY）。
 
     重新配置时：表单为空的项会回退到已有 .env 的对应值，避免把 Dify Key 等项清空。
     """
@@ -378,7 +378,7 @@ def write_env_from_form(form: dict) -> str:
     user = user or existing.get("user") or "root"
     pwd = pwd or existing.get("pwd") or ""
     db = db or existing.get("db") or "company_agent"
-    dify = dify or cur.get("DIFY_KEY_WF6", "")
+    dify = dify or cur.get("DIFY_AGENT_KEY", "")
     db_url = f"mysql+pymysql://{user}:{pwd}@{host}:{port}/{db}"
 
     tpl_path = ROOT_DIR / ".env.example"
@@ -389,8 +389,8 @@ def write_env_from_form(form: dict) -> str:
         if line.startswith("DB_URL="):
             out.append(f"DB_URL={db_url}")
             seen_db = True
-        elif line.startswith("DIFY_KEY_WF6="):
-            out.append(f"DIFY_KEY_WF6={dify}")
+        elif line.startswith("DIFY_AGENT_KEY="):
+            out.append(f"DIFY_AGENT_KEY={dify}")
             seen_dify = True
         else:
             # 模板里留空的自定义项（如 ROSTER_XLSX=），若已有 .env 有值则沿用
@@ -403,10 +403,10 @@ def write_env_from_form(form: dict) -> str:
     if not seen_db:
         out.append(f"DB_URL={db_url}")
     if not seen_dify:
-        out.append(f"DIFY_KEY_WF6={dify}")
+        out.append(f"DIFY_AGENT_KEY={dify}")
     # 保留模板之外的已有自定义配置（如 ROSTER_XLSX、SEED_ATTENDANCE）
     for k, v in cur.items():
-        if k in ("DB_URL", "DIFY_KEY_WF6"):
+        if k in ("DB_URL", "DIFY_AGENT_KEY"):
             continue
         if not any(l.startswith(k + "=") for l in out):
             out.append(f"{k}={v}")
@@ -899,7 +899,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "user": db_info.get("user", ""),
                     "pwd_masked": "******" if db_info.get("pwd") else "",
                     "db": db_info.get("db", ""),
-                    "dify": existing.get("DIFY_KEY_WF6", ""),
+                    "dify": existing.get("DIFY_AGENT_KEY", ""),
                 }, ensure_ascii=False))
             else:
                 self._send(200, json.dumps({"ok": False}, ensure_ascii=False))

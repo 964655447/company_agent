@@ -1,15 +1,13 @@
 from datetime import datetime, date, timedelta
-import json
-
-import httpx
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import DIFY_AGENT_KEY, DIFY_BASE_URL, WORK_START
+from ..config import WORK_START
 from ..database import get_db
+from ..dify_client import call_dify_agent
 from ..models import Attendance, Employee
 from ..security import get_current_user, require_manager
 
@@ -22,6 +20,7 @@ class CheckinIn(BaseModel):
 
 class AskIn(BaseModel):
     question: str = ""       # 用户自然语言提问，如「这个月我考勤多少天」
+    conversation_id: str | None = None   # 续会话用：回传上一次的会话 id
 
 
 class QueryIn(BaseModel):
@@ -171,71 +170,36 @@ def my_attendance(period: str = Query(..., pattern="^(week|month)$"),
 async def attendance_ask(body: AskIn,
                          user: Employee = Depends(get_current_user),
                          db: Session = Depends(get_db)):
-    """悬浮气泡入口：统一智能体（Dify Agent），集合所有工作流。"""
+    """悬浮气泡入口：统一智能体（Dify Agent），集合所有工作流。
+
+    已携带员工身份 + 权限上下文，交给 Dify Agent 做权限感知的回答；
+    Dify 未配置或异常时降级到本地兜底（仅考勤统计）。
+    """
     q = (body.question or "").strip() or "这个月我的考勤情况"
 
-    # 有 Key → 调 Dify 统一智能体（Agent 只支持 streaming 模式）
-    if DIFY_AGENT_KEY:
-        try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                async with client.stream(
-                    "POST",
-                    f"{DIFY_BASE_URL.rstrip('/')}/chat-messages",
-                    headers={
-                        "Authorization": f"Bearer {DIFY_AGENT_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "query": q,
-                        "response_mode": "streaming",
-                        "user": str(user.employee_id),
-                        "inputs": {"emp_id": str(user.employee_id), "emp_name": user.name},
-                    },
-                ) as resp:
-                    resp.raise_for_status()
-                    parts = []
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: "):
-                            data = line[6:]
-                            if data == "[DONE]":
-                                break
-                            try:
-                                chunk = json.loads(data)
-                                content = (chunk.get("answer") or "")
-                                if not content:
-                                    continue
-                                # Dify Agent 流式响应里 answer 可能既发增量又发全量
-                                # （全量 chunk 会把前面内容整段重发），需去重避免重复。
-                                prev = "".join(parts)
-                                if prev and content.startswith(prev):
-                                    parts = [content]          # 全量覆盖
-                                elif prev:
-                                    ov = 0
-                                    for i in range(1, min(len(prev), len(content)) + 1):
-                                        if prev.endswith(content[:i]):
-                                            ov = i
-                                    parts.append(content[ov:])  # 增量/重叠：截掉重复前缀
-                                else:
-                                    parts.append(content)
-                            except (json.JSONDecodeError, KeyError):
-                                continue
-            answer = "".join(parts) or "智能体未返回内容"
-            return {"answer": answer, "ai": True}
-        except Exception as e:
-            # Dify 不可用时降级到本地兜底
-            return {"answer": _local_fallback(q, user, db), "ai": False}
-
-    # 无 Key → 纯本地
-    return {"answer": _local_fallback(q, user, db), "ai": False}
+    answer, ai, conv_id = await call_dify_agent(user, q, body.conversation_id)
+    if ai:
+        return {"answer": answer, "ai": True, "conversation_id": conv_id}
+    return {"answer": _local_fallback(q, user, db), "ai": False, "conversation_id": conv_id}
 
 
 def _local_fallback(q: str, user: Employee, db: Session) -> str:
-    """Dify 不可用时的本地兜底回答（仅考勤统计）。"""
-    period = "week" if any(w in q for w in ("本周", "这周", "这星期", "周考勤")) else "month"
-    start = _period_start(period)
+    """Dify 不可用时的本地兜底回答（仅考勤统计）。
+
+    支持：本周、本月、上个月（后续可扩展为上月/last_month 等同义词）。
+    """
+    if any(w in q for w in ("本周", "这周", "这星期", "周考勤")):
+        period_key = "week"
+    elif any(w in q for w in ("上个月", "上月")):
+        period_key = "last_month"
+    else:
+        period_key = "month"
+
+    start, end = _resolve_period_range(period_key, None, None, None)
     rows = db.scalars(select(Attendance).where(
         Attendance.employee_id == user.employee_id,
         Attendance.work_date >= start,
+        Attendance.work_date <= end,
     ).order_by(Attendance.checkin_time)).all()
 
     clock_ins = [r for r in rows if r.type == "clock_in"]
@@ -248,9 +212,9 @@ def _local_fallback(q: str, user: Employee, db: Session) -> str:
         total_min = sum(r.checkin_time.hour * 60 + r.checkin_time.minute for r in clock_ins)
         avg_clock_in = f"{total_min // len(clock_ins) // 60:02d}:{total_min // len(clock_ins) % 60:02d}"
 
-    period_cn = "本周" if period == "week" else "本月"
+    period_cn = {"week": "本周", "month": "本月", "last_month": "上个月"}.get(period_key, "本月")
     parts = [
-        f"{user.name}{period_cn}已出勤 {days} 天",
+        f"{user.name} {period_cn}（{start} ~ {end}）已出勤 {days} 天",
         f"迟到 {late_count} 次",
         f"平均上班打卡时间 {avg_clock_in}" if avg_clock_in else "",
     ]

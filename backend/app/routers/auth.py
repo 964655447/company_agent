@@ -22,6 +22,7 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
         raise HTTPException(401, "工号或密码错误")
     return {
         "token": create_token(emp),
+        "id": emp.id,
         "role": emp.role,
         "name": emp.name,
         "emp_id": emp.employee_id,

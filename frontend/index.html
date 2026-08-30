@@ -158,14 +158,26 @@
 
     <!-- 智能助手 -->
     <section id="view-chat" class="view">
-<iframe
- src="http://localhost/agent/7mTQLILtAIQ7So5i"
- style="width: 100%; height: 100%; min-height: 700px"
- frameborder="0"
- allow="microphone;clipboard-write">
-</iframe>
+      <div class="chat-wrap card">
+        <div class="chat-head">
+          <span class="chat-ico">💬</span>
+          <div>
+            <div class="chat-title">智能助手</div>
+            <div class="chat-sub" id="chat-sub">已接入统一智能体，可问考勤 / 报销 / 工资 / 考核，会记住我们的对话</div>
+          </div>
+        </div>
+        <div class="chat-log" id="chat-log" aria-live="polite"></div>
+        <div class="chat-quick" id="chat-quick">
+          <button data-q="这个月我的考勤情况怎么样？">本月考勤</button>
+          <button data-q="帮我查一下我上个月的迟到情况">上月迟到</button>
+          <button data-q="我的报销进度怎么样了">报销进度</button>
+        </div>
+        <form id="chat-form" class="chat-input-row">
+          <input id="chat-input" placeholder="问问智能助手，例如：这个月我迟到几次？" autocomplete="off">
+          <button type="submit" class="btn-primary btn-sm" id="chat-send">发送</button>
+        </form>
+      </div>
     </section>
-
     <!-- 管理看板（管理者） -->
     <section id="view-admin" class="view">
       <h2 class="view-title">管理看板</h2>
@@ -318,7 +330,7 @@
     </div>
   </div>
 </div>
-
 <script src="js/app.js"></script>
+
 </body>
 </html>
