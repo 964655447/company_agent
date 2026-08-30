@@ -175,7 +175,7 @@ def seed_employees(conn):
             print("[employees] 已有数据，跳过导入（如需重导请先清空表）")
             return
         ins = (
-            "INSERT INTO employees (no, emp_id, name, password_hash, permissions, position, department) "
+            "INSERT INTO employees (no, employee_id, name, password_hash, permissions, position, department) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s)"
         )
         for r in data:
@@ -207,8 +207,8 @@ def gen_attendance(conn):
         d += timedelta(days=1)
 
     with conn.cursor() as cur:
-        cur.execute(f"SELECT id FROM {DB_NAME}.employees ORDER BY id")
-        emp_ids = [row["id"] for row in cur.fetchall()]
+        cur.execute(f"SELECT employee_id FROM {DB_NAME}.employees ORDER BY employee_id")
+        emp_ids = [row["employee_id"] for row in cur.fetchall()]
         cur.execute(f"SELECT COUNT(*) AS c FROM {DB_NAME}.attendance")
         if cur.fetchone()["c"] > 0:
             print("[attendance] 已有数据，跳过生成")

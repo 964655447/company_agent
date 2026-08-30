@@ -25,7 +25,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_token(emp: Employee) -> str:
     payload = {
         "sub": str(emp.id),
-        "emp_id": emp.emp_id,
+        "emp_id": emp.employee_id,
         "name": emp.name,
         "role": emp.role,
         "exp": datetime.utcnow() + timedelta(hours=TOKEN_EXPIRE_HOURS),

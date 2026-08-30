@@ -32,14 +32,14 @@ def add_employee(body: EmployeeIn, manager: Employee = Depends(require_manager),
                 db: Session = Depends(get_db)):
     if not body.password:
         raise HTTPException(422, "新员工必须设置初始密码")
-    if db.scalar(select(Employee).where(Employee.emp_id == body.emp_id)):
+    if db.scalar(select(Employee).where(Employee.employee_id == body.emp_id)):
         raise HTTPException(400, f"工号 {body.emp_id} 已存在")
     if db.scalar(select(Employee).where(Employee.name == body.name)):
         raise HTTPException(400, f"姓名 {body.name} 已存在")
     max_no = db.scalar(select(Employee.no).order_by(Employee.no.desc()))
     emp = Employee(
         no=body.no if body.no else (max_no + 1 if max_no else 1),
-        emp_id=body.emp_id, name=body.name,
+        employee_id=body.employee_id, name=body.name,
         password_hash=hash_password(body.password),
         permissions=__import__("json").dumps(body.permissions, ensure_ascii=False),
         position=body.position, department=body.department,
@@ -56,7 +56,7 @@ def update_employee(emp_pk: int, body: EmployeeIn,
     emp = db.get(Employee, emp_pk)
     if not emp:
         raise HTTPException(404, "员工不存在")
-    emp.emp_id, emp.name = body.emp_id, body.name
+    emp.employee_id, emp.name = body.employee_id, body.name
     emp.position, emp.department = body.position, body.department
     emp.permissions = __import__("json").dumps(body.permissions, ensure_ascii=False)
     if body.no:

@@ -9,7 +9,7 @@
 CREATE TABLE IF NOT EXISTS `employees` (
   `id` int NOT NULL AUTO_INCREMENT,
   `no` int NOT NULL COMMENT '花名册序号',
-  `emp_id` bigint NOT NULL COMMENT '工号，登录账号，如 220401',
+  `employee_id` bigint NOT NULL COMMENT '工号，登录账号，如 220401',
   `name` varchar(32) NOT NULL COMMENT '姓名',
   `password_hash` varchar(255) NOT NULL COMMENT 'argon2/bcrypt 哈希，禁止明文',
   `permissions` json NOT NULL COMMENT '可访问岗位范围数组，如 ["总经办","商务部"]',
@@ -19,14 +19,14 @@ CREATE TABLE IF NOT EXISTS `employees` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `no` (`no`),
-  UNIQUE KEY `emp_id` (`emp_id`),
+  UNIQUE KEY `uk_employee_id` (`employee_id`),
   UNIQUE KEY `uk_emp_name` (`name`),
   KEY `idx_emp_dept` (`department`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='花名册';
 
 CREATE TABLE IF NOT EXISTS `attendance` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `employee_id` int NOT NULL COMMENT '员工id → employees.id',
+  `employee_id` bigint NOT NULL COMMENT '员工工号 → employees.employee_id',
   `checkin_time` datetime NOT NULL COMMENT '打卡时间',
   `type` enum('clock_in','clock_out') NOT NULL COMMENT '上班/下班',
   `is_late` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否迟到',
@@ -34,12 +34,12 @@ CREATE TABLE IF NOT EXISTS `attendance` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_att_emp_date` (`employee_id`,`work_date`),
-  CONSTRAINT `fk_att_emp` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`)
+  CONSTRAINT `fk_att_emp` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='考勤';
 
 CREATE TABLE IF NOT EXISTS `reimbursement` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `employee_id` int NOT NULL COMMENT '申请人 → employees.id',
+  `employee_id` bigint NOT NULL COMMENT '申请人工号 → employees.employee_id',
   `applicant_name` varchar(64) NOT NULL COMMENT '申请人名称',
   `category` varchar(64) NOT NULL COMMENT '报销类目',
   `amount` decimal(10,2) NOT NULL COMMENT '金额',
@@ -50,12 +50,13 @@ CREATE TABLE IF NOT EXISTS `reimbursement` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `fk_reimb_appr` (`approver_id`),
-  KEY `idx_reimb_emp_status` (`employee_id`,`status`)
+  KEY `idx_reimb_emp_status` (`employee_id`,`status`),
+  CONSTRAINT `fk_reimb_emp` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='费用报销';
 
 CREATE TABLE IF NOT EXISTS `employee_salary` (
   `no` int NOT NULL COMMENT '序号',
-  `id` varchar(10) NOT NULL COMMENT '员工工号',
+  `employee_id` bigint NOT NULL COMMENT '员工工号',
   `name` varchar(50) NOT NULL COMMENT '员工姓名',
   `position` varchar(50) NOT NULL COMMENT '职位',
   `base_salary` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '基本工资(固定不变)',
@@ -63,16 +64,16 @@ CREATE TABLE IF NOT EXISTS `employee_salary` (
   `performance_bonus` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '绩效奖金 MIN(base_salary*performance_factor,10000)',
   `allowance` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '补贴',
   `gross_salary` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '应发合计 = base_salary + performance_bonus + allowance',
-  PRIMARY KEY (`id`),
+  PRIMARY KEY (`employee_id`),
   UNIQUE KEY `uk_no` (`no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='员工薪资绩效表';
 
 CREATE TABLE IF NOT EXISTS `assessment_log` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `employee_id` int NOT NULL COMMENT '员工id',
+  `employee_id` bigint NOT NULL COMMENT '员工工号',
   `position_queried` varchar(64) NOT NULL COMMENT '查询的岗位',
   `queried_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_asl_emp` (`employee_id`),
-  CONSTRAINT `fk_asl_emp` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`)
+  CONSTRAINT `fk_asl_emp` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='考核查询日志';

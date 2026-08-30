@@ -42,7 +42,7 @@ def seed_employees(force: bool = False) -> int:
             no_, name, emp_id, pwd, perms, position, dept = r[:7]
             permissions = [p.strip() for p in str(perms or "").split("、") if p.strip()]
             db.add(Employee(
-                no=int(no_), emp_id=int(emp_id), name=str(name).strip(),
+                no=int(no_), employee_id=int(emp_id), name=str(name).strip(),
                 password_hash=hash_password(str(pwd)),
                 permissions=__import__("json").dumps(permissions, ensure_ascii=False),
                 position=str(position).strip(), department=str(dept).strip(),

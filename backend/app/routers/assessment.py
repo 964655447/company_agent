@@ -23,7 +23,7 @@ async def query_position(body: QueryIn,
     if not position:
         return {"intro": "请输入想了解的岗位名称"}
     result = wf4_fallback(position)
-    db.add(AssessmentLog(employee_id=user.id, position_queried=position))
+    db.add(AssessmentLog(employee_id=user.employee_id, position_queried=position))
     db.commit()
     return result
 
@@ -33,7 +33,7 @@ def stats(manager: Employee = Depends(require_manager),
           db: Session = Depends(get_db)):
     rows = db.execute(
         select(AssessmentLog.position_queried, Employee.name, func.count(AssessmentLog.id))
-        .join(Employee, AssessmentLog.employee_id == Employee.id)
+        .join(Employee, AssessmentLog.employee_id == Employee.employee_id)
         .group_by(AssessmentLog.position_queried, Employee.name)
         .order_by(func.count(AssessmentLog.id).desc())
     ).all()

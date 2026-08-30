@@ -15,7 +15,7 @@ class Employee(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     no = Column(Integer, nullable=False, unique=True)
-    emp_id = Column(BigInteger, nullable=False, unique=True)   # 工号，登录账号
+    employee_id = Column(BigInteger, nullable=False, unique=True)   # 工号，登录账号
     name = Column(String(32), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
     permissions = Column(Text, nullable=False, default="[]")  # JSON 数组：可访问岗位范围
@@ -40,7 +40,7 @@ class Employee(Base):
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id, "no": self.no, "emp_id": self.emp_id,
+            "id": self.id, "no": self.no, "emp_id": self.employee_id,
             "name": self.name, "permissions": self.permission_list,
             "position": self.position, "department": self.department,
             "role": self.role,
@@ -52,7 +52,7 @@ class Attendance(Base):
     __table_args__ = (Index("idx_att_emp_date", "employee_id", "work_date"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    employee_id = Column(Integer, nullable=False)
+    employee_id = Column(BigInteger, nullable=False)
     checkin_time = Column(DateTime, nullable=False)
     type = Column(String(16), nullable=False)                  # clock_in / clock_out
     is_late = Column(Boolean, nullable=False, default=False)
@@ -72,7 +72,7 @@ class Reimbursement(Base):
     __table_args__ = (Index("idx_reimb_emp_status", "employee_id", "status"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    employee_id = Column(Integer, nullable=False)
+    employee_id = Column(BigInteger, nullable=False)
     applicant_name = Column(String(64), nullable=False, default="")  # 申请人名称（冗余存储，去外键后保留）
     category = Column(String(64), nullable=False, default="")
     amount = Column(Float, nullable=False, default=0)
@@ -96,7 +96,7 @@ class EmployeeSalary(Base):
     __tablename__ = "employee_salary"
 
     no = Column(Integer, nullable=False)                                # 序号
-    id = Column(String(10), primary_key=True)                          # 工号（VARCHAR，登录账号）
+    employee_id = Column(BigInteger, primary_key=True)                 # 工号（登录账号）
     name = Column(String(50), nullable=False)
     position = Column(String(50), nullable=False)
     base_salary = Column(Float, nullable=False, default=0)             # 基本工资（固定不变）
@@ -107,7 +107,7 @@ class EmployeeSalary(Base):
 
     def to_dict(self) -> dict:
         return {
-            "no": self.no, "id": self.id, "name": self.name,
+            "no": self.no, "employee_id": self.employee_id, "name": self.name,
             "position": self.position,
             "base_salary": round(self.base_salary, 2),
             "performance_rating": float(self.performance_rating or 0),
@@ -125,6 +125,6 @@ class AssessmentLog(Base):
     __tablename__ = "assessment_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    employee_id = Column(Integer, nullable=False)
+    employee_id = Column(BigInteger, nullable=False)
     position_queried = Column(String(64), nullable=False)
     queried_at = Column(DateTime, nullable=False, default=datetime.now)

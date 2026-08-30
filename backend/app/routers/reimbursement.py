@@ -16,13 +16,13 @@ def _resolve_employee_id(db: Session, emp_id: str):
     """免鉴权调试模式：优先用传入工号解析员工，否则回退到库内首位员工。"""
     if emp_id:
         try:
-            emp = db.scalar(select(Employee).where(Employee.emp_id == int(emp_id)))
+            emp = db.scalar(select(Employee).where(Employee.employee_id == int(emp_id)))
             if emp:
-                return emp.id
+                return emp.employee_id
         except (ValueError, TypeError):
             pass
     first = db.scalar(select(Employee).order_by(Employee.id).limit(1))
-    return first.id if first else None
+    return first.employee_id if first else None
 
 
 @router.post("/submit")
@@ -67,9 +67,9 @@ def my_reimbursements(emp_id: str = "", db: Session = Depends(get_db)):
     q = select(Reimbursement)
     if emp_id:
         try:
-            emp = db.scalar(select(Employee).where(Employee.emp_id == int(emp_id)))
+            emp = db.scalar(select(Employee).where(Employee.employee_id == int(emp_id)))
             if emp:
-                q = q.where(Reimbursement.employee_id == emp.id)
+                q = q.where(Reimbursement.employee_id == emp.employee_id)
         except (ValueError, TypeError):
             pass
     rows = db.scalars(q.order_by(Reimbursement.submit_time.desc())).all()
@@ -99,7 +99,7 @@ def review(ticket_id: int, body: ReviewIn, db: Session = Depends(get_db)):
 @router.get("/report")
 async def reimbursement_report(db: Session = Depends(get_db)):
     emps = db.scalars(select(Employee)).all()
-    visible_ids = {e.id: e for e in emps}
+    visible_ids = {e.employee_id: e for e in emps}
     rows = db.scalars(select(Reimbursement).where(
         Reimbursement.employee_id.in_(visible_ids.keys()),
     ).order_by(Reimbursement.submit_time.desc())).all()

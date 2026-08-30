@@ -134,7 +134,7 @@ def checkin(body: CheckinIn, user: Employee = Depends(get_current_user),
     now = datetime.now()
     today = now.date()
     dup = db.scalar(select(Attendance).where(
-        Attendance.employee_id == user.id,
+        Attendance.employee_id == user.employee_id,
         Attendance.work_date == today,
         Attendance.type == body.type,
     ))
@@ -147,7 +147,7 @@ def checkin(body: CheckinIn, user: Employee = Depends(get_current_user),
     is_late = body.type == "clock_in" and (
         now.hour * 60 + now.minute > hh * 60 + mm
     )
-    rec = Attendance(employee_id=user.id, checkin_time=now, type=body.type,
+    rec = Attendance(employee_id=user.employee_id, checkin_time=now, type=body.type,
                      is_late=is_late, work_date=today)
     db.add(rec)
     db.commit()
@@ -161,7 +161,7 @@ def my_attendance(period: str = Query(..., pattern="^(week|month)$"),
                    db: Session = Depends(get_db)):
     start = _period_start(period)
     rows = db.scalars(select(Attendance).where(
-        Attendance.employee_id == user.id,
+        Attendance.employee_id == user.employee_id,
         Attendance.work_date >= start,
     ).order_by(Attendance.checkin_time)).all()
     return {"records": [r.to_dict() for r in rows]}
@@ -188,8 +188,8 @@ async def attendance_ask(body: AskIn,
                     json={
                         "query": q,
                         "response_mode": "streaming",
-                        "user": str(user.emp_id),
-                        "inputs": {"emp_id": str(user.emp_id), "emp_name": user.name},
+                        "user": str(user.employee_id),
+                        "inputs": {"emp_id": str(user.employee_id), "emp_name": user.name},
                     },
                 ) as resp:
                     resp.raise_for_status()
@@ -234,7 +234,7 @@ def _local_fallback(q: str, user: Employee, db: Session) -> str:
     period = "week" if any(w in q for w in ("本周", "这周", "这星期", "周考勤")) else "month"
     start = _period_start(period)
     rows = db.scalars(select(Attendance).where(
-        Attendance.employee_id == user.id,
+        Attendance.employee_id == user.employee_id,
         Attendance.work_date >= start,
     ).order_by(Attendance.checkin_time)).all()
 
@@ -275,7 +275,7 @@ async def attendance_command(body: CommandIn,
     """员工端一句话指令入口：打卡 / 查考勤（本地规则执行，不依赖外部 AI）。"""
     cmd = (body.command or "").strip() or "打卡"
     action = _local_parse_action(cmd)
-    data = _do_checkin(str(user.emp_id), action, cmd, db)
+    data = _do_checkin(str(user.employee_id), action, cmd, db)
     return {"answer": _local_summary(data), "ai": False, "command": cmd, "data": data}
 
 
@@ -306,7 +306,7 @@ def _resolve_period_range(period: str, target_date: str | None,
 @router.post("/query")
 def attendance_query(body: QueryIn, db: Session = Depends(get_db)):
     """数据库查询接口：接收结构化参数，返回原始考勤记录 JSON。"""
-    emp = db.scalar(select(Employee).where(Employee.emp_id == body.emp_id))
+    emp = db.scalar(select(Employee).where(Employee.employee_id == body.emp_id))
     if not emp:
         raise HTTPException(404, f"员工工号 {body.emp_id} 不存在")
 
@@ -317,7 +317,7 @@ def attendance_query(body: QueryIn, db: Session = Depends(get_db)):
         raise HTTPException(422, f"日期解析失败：{e}")
 
     rows = db.scalars(select(Attendance).where(
-        Attendance.employee_id == emp.id,
+        Attendance.employee_id == emp.employee_id,
         Attendance.work_date >= start,
         Attendance.work_date <= end,
     ).order_by(Attendance.checkin_time)).all()
@@ -343,7 +343,7 @@ def attendance_query(body: QueryIn, db: Session = Depends(get_db)):
 
     return {
         "employee": {
-            "emp_id": emp.emp_id,
+            "emp_id": emp.employee_id,
             "name": emp.name,
             "department": emp.department,
             "position": emp.position,
@@ -382,8 +382,8 @@ async def attendance_report(period: str = Query("week", pattern="^(week|month)$"
         visible = emps
     if dept:
         visible = [e for e in visible if e.department == dept]
-    ids = [e.id for e in visible]
-    name_map = {e.id: e.name for e in visible}
+    ids = [e.employee_id for e in visible]
+    name_map = {e.employee_id: e.name for e in visible}
 
     start = _period_start(period)
     rows = db.scalars(select(Attendance).where(
@@ -422,7 +422,7 @@ def _do_checkin(emp_id_str: str, action: str, command: str, db: Session) -> dict
     """
     if not str(emp_id_str).strip().isdigit():
         raise HTTPException(400, "emp_id 必须是数字工号")
-    emp = db.scalar(select(Employee).where(Employee.emp_id == int(emp_id_str)))
+    emp = db.scalar(select(Employee).where(Employee.employee_id == int(emp_id_str)))
     if not emp:
         raise HTTPException(404, f"员工工号 {emp_id_str} 不存在")
     action = action if action in ("clock_in", "clock_out") else "clock_in"
@@ -432,7 +432,7 @@ def _do_checkin(emp_id_str: str, action: str, command: str, db: Session) -> dict
     hh, mm = map(int, WORK_START.split(":"))
 
     dup = db.scalar(select(Attendance).where(
-        Attendance.employee_id == emp.id,
+        Attendance.employee_id == emp.employee_id,
         Attendance.work_date == today,
         Attendance.type == action,
     ))
@@ -451,7 +451,7 @@ def _do_checkin(emp_id_str: str, action: str, command: str, db: Session) -> dict
         if action == "clock_in":
             late_minutes = max(now.hour * 60 + now.minute - (hh * 60 + mm), 0)
         is_late = action == "clock_in" and late_minutes > 0
-        db.add(Attendance(employee_id=emp.id, checkin_time=now, type=action,
+        db.add(Attendance(employee_id=emp.employee_id, checkin_time=now, type=action,
                           is_late=is_late, work_date=today))
         db.commit()
         tail = (f"，已超过上班时间 {WORK_START}，迟到 {late_minutes} 分钟"
@@ -467,10 +467,10 @@ def _do_checkin(emp_id_str: str, action: str, command: str, db: Session) -> dict
     w_s, w_e = _range_of("week")
     m_s, m_e = _range_of("month")
     return {
-        "employee": {"emp_id": emp.emp_id, "name": emp.name,
+        "employee": {"emp_id": emp.employee_id, "name": emp.name,
                      "department": emp.department, "position": emp.position},
         "command": command, "action": action,
         "checkin": checkin_result,
-        "week": _stats_for(db, emp.id, w_s, w_e, "week"),
-        "month": _stats_for(db, emp.id, m_s, m_e, "month"),
+        "week": _stats_for(db, emp.employee_id, w_s, w_e, "week"),
+        "month": _stats_for(db, emp.employee_id, m_s, m_e, "month"),
     }

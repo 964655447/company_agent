@@ -17,14 +17,14 @@ class LoginIn(BaseModel):
 
 @router.post("/login")
 def login(body: LoginIn, db: Session = Depends(get_db)):
-    emp = db.scalar(select(Employee).where(Employee.emp_id == body.emp_id))
+    emp = db.scalar(select(Employee).where(Employee.employee_id == body.emp_id))
     if not emp or not verify_password(body.password, emp.password_hash):
         raise HTTPException(401, "工号或密码错误")
     return {
         "token": create_token(emp),
         "role": emp.role,
         "name": emp.name,
-        "emp_id": emp.emp_id,
+        "emp_id": emp.employee_id,
         "department": emp.department,
         "position": emp.position,
         "permissions": emp.permission_list,

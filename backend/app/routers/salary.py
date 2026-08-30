@@ -52,7 +52,7 @@ async def submit_performance(body: PerformanceIn,
     allowance = SUBSIDY_DEFAULT
     gross = round(base_salary + perf_bonus + allowance, 2)
 
-    rec = db.scalar(select(Salary).where(Salary.id == str(user.emp_id)))
+    rec = db.scalar(select(Salary).where(Salary.employee_id == str(user.employee_id)))
     if rec:  # 重复提交 → 覆盖本人工资核算
         rec.no, rec.name, rec.position = user.no, user.name, user.position
         rec.base_salary = base_salary
@@ -60,7 +60,7 @@ async def submit_performance(body: PerformanceIn,
         rec.performance_bonus, rec.allowance, rec.gross_salary = perf_bonus, allowance, gross
     else:
         rec = Salary(
-            id=str(user.emp_id), no=user.no, name=user.name, position=user.position,
+            employee_id=str(user.employee_id), no=user.no, name=user.name, position=user.position,
             base_salary=base_salary, performance_rating=factor,
             performance_bonus=perf_bonus, allowance=allowance, gross_salary=gross,
         )
@@ -78,7 +78,7 @@ async def submit_performance(body: PerformanceIn,
 def my_salary(user: Employee = Depends(get_current_user),
               db: Session = Depends(get_db)):
     rows = db.scalars(select(Salary).where(
-        Salary.id == user.emp_id,
+        Salary.employee_id == user.employee_id,
     )).all()
     return {"records": [r.to_dict() for r in rows]}
 
@@ -99,12 +99,12 @@ class SalaryUpsert(BaseModel):
 async def upsert_salary(emp_id: str, body: SalaryUpsert,
                         manager: Employee = Depends(require_manager),
                         db: Session = Depends(get_db)):
-    emp = db.scalar(select(Employee).where(Employee.emp_id == int(emp_id)))
+    emp = db.scalar(select(Employee).where(Employee.employee_id == int(emp_id)))
     if not emp:
         return {"error": f"工号 {emp_id} 不存在"}
-    rec = db.scalar(select(Salary).where(Salary.id == emp_id))
+    rec = db.scalar(select(Salary).where(Salary.employee_id == emp_id))
     if not rec:
-        rec = Salary(id=emp_id)
+        rec = Salary(employee_id=emp_id)
         db.add(rec)
     rec.no = body.no if body.no is not None else emp.no
     rec.name = body.name if body.name is not None else emp.name
@@ -124,12 +124,12 @@ async def salary_report(manager: Employee = Depends(require_manager),
     perms = set(manager.permission_list)
     emps = db.scalars(select(Employee)).all()
     if len(perms) >= 5:
-        visible = {e.emp_id: e for e in emps}
+        visible = {e.employee_id: e for e in emps}
     else:
-        visible = {e.emp_id: e for e in emps
-                   if e.position in perms or e.emp_id == manager.emp_id}
+        visible = {e.employee_id: e for e in emps
+                   if e.position in perms or e.employee_id == manager.employee_id}
     rows = db.scalars(select(Salary).where(
-        Salary.id.in_(visible.keys()),
+        Salary.employee_id.in_(visible.keys()),
     )).all()
     totals = [r.gross_salary for r in rows]
     stats = {
