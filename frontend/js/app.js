@@ -6,7 +6,7 @@ const TOKEN_KEY = "cm_token", USER_KEY = "cm_user";
 
 const $ = (sel) => document.querySelector(sel);
 const state = { user: null, rosterEditing: null, attPeriod: "week", adminAttPeriod: "week",
-                chatConvId: null };
+                floatConvId: null, chatConvId: null };
 
 /* 转义 HTML 后保留换行，便于展示多行回答 */
 function renderText(s) {
@@ -191,6 +191,7 @@ function enterApp(user) {
   state.user = user;
   $("#login-page").classList.add("hidden");
   $("#app-page").classList.remove("hidden");
+  $("#float-bubble").classList.remove("hidden");
   $("#user-name").textContent = `${user.name}（${user.role === "manager" ? "管理者" : "员工"}）`;
   $("#user-dept").textContent = `${user.department} · ${user.position}`;
   $("#user-avatar").textContent = user.name.slice(0, 1);
@@ -748,3 +749,104 @@ function openChatView() {
   const ci = $("#chat-input");
   if (ci) ci.focus();
 }
+
+/* ---------------- 悬浮考勤小助手 ---------------- */
+const floatGreeted = { done: false };
+
+function renderUserCard(user) {
+  if (!user) return "";
+  const roleText = user.role === "manager" ? "管理者" : "员工";
+  const idNo = (user.id !== undefined && user.id !== null) ? user.id : user.emp_id;
+  return `<div class="float-idcard">
+    <div class="float-idcard-title">当前登录身份</div>
+    <div class="float-idcard-row"><span>ID</span><b>${esc(idNo)}</b></div>
+    <div class="float-idcard-row"><span>工号</span><b>${esc(user.emp_id)}</b></div>
+    <div class="float-idcard-row"><span>姓名</span><b>${esc(user.name)}</b></div>
+    <div class="float-idcard-row"><span>部门</span><b>${esc(user.department)}</b></div>
+    <div class="float-idcard-row"><span>岗位</span><b>${esc(user.position)}</b></div>
+    <div class="float-idcard-row"><span>角色</span><b>${roleText}</b></div>
+  </div>`;
+}
+
+function floatTogglePanel(show) {
+  const p = $("#float-panel");
+  const open = (show !== undefined) ? show : p.classList.contains("hidden");
+  p.classList.toggle("hidden", !open);
+  if (open) {
+    const user = state.user;
+    if (user) {
+      $("#float-sub").textContent = `${esc(user.name)} · ${esc(user.department)} · ${esc(user.position)}`;
+    }
+    if (!floatGreeted.done) {
+      floatGreeted.done = true;
+      if (user) {
+        appendFloatMsg("bot", renderUserCard(user), true);
+        appendFloatMsg("bot", `你好，${esc(user.name)}！我是考勤小助手，已识别你的身份。点下方快捷问题或直接输入，比如「这个月我考勤多少天」。`);
+      } else {
+        appendFloatMsg("bot", "你好！我是考勤小助手，点下方快捷问题或直接输入。");
+      }
+    }
+    $("#float-input").focus();
+  }
+}
+
+function appendFloatMsg(role, text, isHtml = false) {
+  const log = $("#float-log");
+  const el = document.createElement("div");
+  el.className = "float-msg " + role;
+  el.innerHTML = isHtml ? text : esc(text);
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+
+function appendFloatTyping() {
+  const log = $("#float-log");
+  const el = document.createElement("div");
+  el.className = "float-msg bot";
+  el.innerHTML = '<span class="float-typing"><i></i><i></i><i></i></span>';
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+
+async function askAttendance(question) {
+  if (!question || !question.trim()) return;
+  appendFloatMsg("user", question.trim());
+  const typing = appendFloatTyping();
+  const sendBtn = $("#float-send");
+  sendBtn.disabled = true;
+  try {
+    const r = await api("/api/attendance/ask", {
+      method: "POST",
+      json: { question: question, conversation_id: state.floatConvId },
+    });
+    if (r.conversation_id) state.floatConvId = r.conversation_id;
+    typing.innerHTML = renderText(r.answer);
+  } catch (err) {
+    typing.innerHTML = "出错了：" + esc(err.message);
+  } finally {
+    sendBtn.disabled = false;
+    const log = $("#float-log");
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+$("#float-bubble").addEventListener("click", () => floatTogglePanel());
+$("#float-bubble").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
+});
+$("#float-close").addEventListener("click", () => floatTogglePanel(false));
+$("#float-quick").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-q]");
+  if (btn) askAttendance(btn.dataset.q);
+});
+$("#float-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const v = $("#float-input").value;
+  $("#float-input").value = "";
+  askAttendance(v);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("#float-panel").classList.contains("hidden")) floatTogglePanel(false);
+});
