@@ -4,9 +4,9 @@
   1. cd backend
   2. cp ../.env.example .env        （或首次启动启动器时网页填写数据库信息）
   3. pip install -r requirements.txt
-  4. python setup_mysql.py                     # 自动建库 + 5 张表（幂等，可重复跑）
-  5.（可选）python setup_mysql.py --seed-demo         # 程序化生成演示数据（员工/考勤/薪资/报销/考核，幂等，已非空表跳过）
-                                                  # 加 --reset 则先清空 5 张表再重灌
+  4. python setup_mysql.py                     # 自动建库 + 6 张表（幂等，可重复跑）
+  5.（可选）python setup_mysql.py --seed-demo         # 程序化生成演示数据（员工/考勤/薪资/报销/考核查询日志/考核成绩，幂等，已非空表跳过）
+                                                  # 加 --reset 则先清空 6 张表再重灌
   6.（可选）python setup_mysql.py --seed-employees   # 需本机有花名册.xlsx
                                                   # 再设环境变量 SEED_ATTENDANCE=1 可生成演示考勤
 
@@ -192,20 +192,51 @@ def seed_employees(conn):
         print(f"[employees] 已导入 {len(data)} 名员工（bcrypt 哈希）")
 
 
+def _gen_attendance_month(conn, cur, emp_ids, year, month, last_day):
+    """为指定月份（含 last_day 当天）生成每位员工的上下班打卡，返回插入条数。"""
+    workdays = []
+    d = date(year, month, 1)
+    while d <= last_day:
+        if d.weekday() < 5:  # 周一~周五
+            workdays.append(d)
+        d += timedelta(days=1)
+    ins = ("INSERT INTO attendance (employee_id, checkin_time, type, is_late, work_date) "
+           "VALUES (%s,%s,%s,%s,%s)")
+    n = 0
+    for eid in emp_ids:
+        for wd in workdays:
+            late = random.random() < 0.12
+            minute = random.randint(3, 42) if late else random.randint(0, 55)
+            cin = datetime(wd.year, wd.month, wd.day, 9, minute)
+            cur.execute(ins, (eid, cin, "clock_in", late, wd))
+            cout = datetime(wd.year, wd.month, wd.day, 18, random.randint(0, 45))
+            cur.execute(ins, (eid, cout, "clock_out", False, wd))
+            n += 2
+    return n
+
+
+def _recent_months(today, months_back=2):
+    """返回 [当月, 前1月, 前2月, ...] 的 (year, month) 列表（含当月共 months_back+1 个月）。"""
+    months = [(today.year, today.month)]
+    y, m = today.year, today.month
+    for _ in range(months_back):
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+        months.append((y, m))
+    return months
+
+
+def _last_day_of(yy, mm):
+    nxt = date(yy + 1, 1, 1) if mm == 12 else date(yy, mm + 1, 1)
+    return nxt - timedelta(days=1)
+
+
 def gen_attendance(conn):
     if not SEED_ATTENDANCE:
         print("[attendance] 未开启 SEED_ATTENDANCE，跳过（演示数据，同事一般不需）")
         return
-    from datetime import date, datetime, timedelta
-    import random
-
-    end = date.today()
-    workdays = []
-    d = date(end.year, end.month, 1)
-    while d <= end:
-        if d.weekday() < 5:
-            workdays.append(d)
-        d += timedelta(days=1)
 
     with conn.cursor() as cur:
         cur.execute(f"SELECT employee_id FROM {DB_NAME}.employees ORDER BY employee_id")
@@ -214,22 +245,13 @@ def gen_attendance(conn):
         if cur.fetchone()["c"] > 0:
             print("[attendance] 已有数据，跳过生成")
             return
-        ins = (
-            "INSERT INTO attendance (employee_id, checkin_time, type, is_late, work_date) "
-            "VALUES (%s,%s,%s,%s,%s)"
-        )
-        n = 0
-        for eid in emp_ids:
-            for wd in workdays:
-                late = random.random() < 0.12
-                minute = random.randint(3, 42) if late else random.randint(0, 55)
-                cin = datetime(wd.year, wd.month, wd.day, 9, minute)
-                cur.execute(ins, (eid, cin, "clock_in", late, wd))
-                cout = datetime(wd.year, wd.month, wd.day, 18, random.randint(0, 45))
-                cur.execute(ins, (eid, cout, "clock_out", False, wd))
-                n += 2
+        today = date.today()
+        total = 0
+        for (yy, mm) in _recent_months(today, months_back=2):
+            last_day = today if (yy == today.year and mm == today.month) else _last_day_of(yy, mm)
+            total += _gen_attendance_month(conn, cur, emp_ids, yy, mm, last_day)
         conn.commit()
-        print(f"[attendance] 已生成 {n} 条记录（{len(emp_ids)} 人 × {len(workdays)} 工作日）")
+        print(f"[attendance] 已生成 {total} 条记录（{len(emp_ids)} 人 × 近 3 个月）")
 
 
 
@@ -239,7 +261,7 @@ def gen_attendance(conn):
 #   python setup_mysql.py --seed-demo            # 对空表造数（各表自带幂等守卫，已非空跳过）
 #   python setup_mysql.py --seed-demo --reset    # 清空 5 张表后重新造数
 # 说明：employees 为空时插入 27 名演示员工（工号 220401+，密码统一 123456）；
-#       其余表按现有员工生成考勤/薪资/报销/考核演示数据。全部幂等，重复跑不重复造。
+#       其余表按现有员工生成考勤/薪资/报销/考核查询日志/考核成绩演示数据。全部幂等，重复跑不重复造。
 # ------------------------------------------------------------
 # 演示花名册（name, department, position, is_admin）。仅在 employees 为空时插入。
 DEMO_ROSTER = [
@@ -311,30 +333,16 @@ def gen_demo_dataset(conn):
             return
         emp_ids = [e["employee_id"] for e in emps]
 
-        # 2) attendance（当月工作日）
+        # 2) attendance（近 3 个月：当月 + 前 2 个月）
         cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.attendance")
         if cur.fetchone()["c"] == 0:
-            end = date.today()
-            d = date(end.year, end.month, 1)
-            workdays = []
-            while d <= end:
-                if d.weekday() < 5:
-                    workdays.append(d)
-                d += timedelta(days=1)
-            ins = ("INSERT INTO attendance (employee_id, checkin_time, type, is_late, work_date) "
-                   "VALUES (%s,%s,%s,%s,%s)")
-            n = 0
-            for eid in emp_ids:
-                for wd in workdays:
-                    late = random.random() < 0.12
-                    minute = random.randint(3, 42) if late else random.randint(0, 55)
-                    cin = datetime(wd.year, wd.month, wd.day, 9, minute)
-                    cur.execute(ins, (eid, cin, "clock_in", late, wd))
-                    cout = datetime(wd.year, wd.month, wd.day, 18, random.randint(0, 45))
-                    cur.execute(ins, (eid, cout, "clock_out", False, wd))
-                    n += 2
+            today = date.today()
+            total = 0
+            for (yy, mm) in _recent_months(today, months_back=2):
+                last_day = today if (yy == today.year and mm == today.month) else _last_day_of(yy, mm)
+                total += _gen_attendance_month(conn, cur, emp_ids, yy, mm, last_day)
             conn.commit()
-            print(f"[demo] 已生成考勤 {n} 条（{len(emp_ids)} 人 × {len(workdays)} 工作日）")
+            print(f"[demo] 已生成考勤 {total} 条（{len(emp_ids)} 人 × 近 3 个月）")
         else:
             print("[demo] attendance 已有数据，跳过")
 
@@ -400,35 +408,64 @@ def _reset_all(conn):
     print("[reset] 已清空 6 张表")
 
 
-def seed_assessment_stats(conn):
-    """从 contracts/assessment_stats_seed.sql 导入考核成绩（同事 advanced_db_init.sql 转换而来）。
+def gen_assessment_stats_programmatic(conn):
+    """兜底生成：无种子 SQL 时，为每位员工生成 1 条考核成绩，保证一键数据完整。"""
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT employee_id, position FROM {DB_NAME}.employees ORDER BY employee_id"
+        )
+        emps = cur.fetchall()
+        if not emps:
+            print("[seed] 无员工，跳过考核成绩兜底生成")
+            return
+        positions = [e["position"] for e in emps]
+        ins = ("INSERT INTO assessment_stats "
+               "(employee_id, original_position, target_position, score, test_time) "
+               "VALUES (%s,%s,%s,%s,%s)")
+        n = 0
+        now = datetime.now()
+        for e in emps:
+            target = random.choice(positions)
+            score = round(random.uniform(60, 98), 1)
+            test_time = now - timedelta(days=random.randint(15, 220))
+            cur.execute(ins, (e["employee_id"], e["position"], target, score, test_time))
+            n += 1
+        conn.commit()
+        print(f"[seed] 已程序化生成考核成绩 {n} 条（兜底）")
 
-    幂等：assessment_stats 非空则跳过；种子文件缺失则跳过。
+
+def seed_assessment_stats(conn):
+    """考核成绩：优先从 contracts/assessment_stats_seed.sql 导入（同事 advanced_db_init.sql 转换）。
+
+    幂等：assessment_stats 非空则跳过；种子 SQL 缺失或导入为空时，程序化兜底生成，
+    保证「一键生成数据」始终产出完整的考核成绩。
     """
     with conn.cursor() as cur:
         cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.assessment_stats")
         if cur.fetchone()["c"] > 0:
             print("[seed] assessment_stats 已有数据，跳过")
             return
-    if not ASSESSMENT_SEED_SQL.exists():
-        print(f"[seed] 未找到 {ASSESSMENT_SEED_SQL}，跳过考核成绩导入")
-        return
-    sql = ASSESSMENT_SEED_SQL.read_text(encoding="utf-8")
-    stmts, buf = [], ""
-    for line in sql.splitlines():
-        if line.strip().startswith("--"):
-            continue
-        buf += line + "\n"
-        if line.strip().endswith(";"):
-            stmts.append(buf.strip())
-            buf = ""
-    n = 0
-    with conn.cursor() as cur:
-        for s in stmts:
-            cur.execute(s)
-            n += 1
-    conn.commit()
-    print(f"[seed] 已导入考核成绩（{ASSESSMENT_SEED_SQL.name}，{n} 条 INSERT）")
+    imported = 0
+    if ASSESSMENT_SEED_SQL.exists():
+        sql = ASSESSMENT_SEED_SQL.read_text(encoding="utf-8")
+        stmts, buf = [], ""
+        for line in sql.splitlines():
+            if line.strip().startswith("--"):
+                continue
+            buf += line + "\n"
+            if line.strip().endswith(";"):
+                stmts.append(buf.strip())
+                buf = ""
+        with conn.cursor() as cur:
+            for s in stmts:
+                cur.execute(s)
+            cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.assessment_stats")
+            imported = cur.fetchone()["c"]
+        conn.commit()
+        print(f"[seed] 已导入考核成绩（{ASSESSMENT_SEED_SQL.name}，{imported} 条 INSERT）")
+    if imported == 0:
+        print("[seed] 种子 SQL 缺失/为空，改用程序化兜底生成考核成绩")
+        gen_assessment_stats_programmatic(conn)
 
 
 def seed_demo(conn, reset=False):
