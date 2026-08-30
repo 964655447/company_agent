@@ -39,6 +39,9 @@ BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
 SQL_PATH = ROOT_DIR / "contracts" / "database.sql"
 ASSESSMENT_SEED_SQL = ROOT_DIR / "contracts" / "assessment_stats_seed.sql"
+# 工资核算建表 SQL（项目根目录，由用户提供的「1.工资核算建表(先建表再用dify工作流).sql」）。
+# 新建 employee_salary_last_month（带上月 26 行真实工资）与 employee_salary_this_month（空表，待 Dify 工作流插入）。
+SALARY_SQL = ROOT_DIR / "1.工资核算建表(先建表再用dify工作流).sql"
 
 
 # ---------- 轻量读取 .env（不依赖 python-dotenv）----------
@@ -148,6 +151,55 @@ def ensure_tables_orm():
         print(f"[orm] ORM 兜底建表失败：{e}")
 
 
+def run_salary_sql(conn):
+    """执行工资核算建表 SQL：建 employee_salary_last_month / employee_salary_this_month 两张表，并灌入上月 26 行真实工资。
+
+    幂等：
+      - last_month 的 CREATE TABLE 带 IF NOT EXISTS；this_month 无 IF NOT EXISTS（已存在则按 1050 跳过）。
+      - last_month 已非空则跳过其 INSERT，避免重复造数。
+    用于「保存并初始化数据库」与「生成演示数据」两个入口，保证工资表始终存在且数据不重复。
+    """
+    if not SALARY_SQL.exists():
+        print(f"[salary] 未找到工资核算 SQL（{SALARY_SQL.name}），跳过")
+        return
+    sql = SALARY_SQL.read_text(encoding="utf-8")
+    stmts, buf = [], ""
+    for line in sql.splitlines():
+        s = line.strip()
+        if not s or s.startswith("--") or s.startswith("#"):
+            continue
+        buf += line + "\n"
+        if s.endswith(";"):
+            stmts.append(buf.strip())
+            buf = ""
+    with conn.cursor() as chk:
+        chk.execute("SELECT COUNT(*) c FROM employee_salary_last_month")
+        last_has = chk.fetchone()["c"] > 0
+    created, skipped, inserted = 0, 0, 0
+    with conn.cursor() as cur:
+        for s in stmts:
+            if last_has and "INSERT INTO employee_salary_last_month" in s:
+                continue
+            try:
+                cur.execute(s)
+                if s.upper().startswith("CREATE TABLE"):
+                    created += 1
+                elif s.upper().startswith("INSERT"):
+                    inserted += 1
+            except pymysql.err.OperationalError as e:
+                if e.args[0] == 1050:
+                    skipped += 1
+                else:
+                    print(f"[salary] 语句异常：{e}")
+    conn.commit()
+    msg = f"[salary] 工资表就绪：建表 {created} 条"
+    if inserted:
+        msg += f"，灌入上月数据 {inserted} 条"
+    if skipped:
+        msg += f"，{skipped} 条跳过（已存在）"
+    print(msg)
+
+
 def ensure_database(conn=None):
     """确保数据库与表存在（幂等）。返回结果 dict。
 
@@ -168,6 +220,7 @@ def ensure_database(conn=None):
         conn.select_db(DB_NAME)
         run_schema(conn)
         ensure_tables_orm()
+        run_salary_sql(conn)
         return {"ok": True, "msg": f"数据库 {DB_NAME} 已就绪（建库/建表完成）"}
     except Exception as e:
         return {"ok": False, "msg": f"数据库初始化失败: {e}"}
@@ -492,6 +545,7 @@ def seed_demo(conn, reset=False):
         _reset_all(conn)
     gen_demo_dataset(conn)
     seed_assessment_stats(conn)
+    run_salary_sql(conn)
     print("[seed-demo] 演示数据生成完成")
 
 
@@ -508,7 +562,7 @@ def main():
         elif SEED_ATTENDANCE:
             gen_attendance(conn)
         with conn.cursor() as cur:
-            for t in ("employees", "attendance", "reimbursement", "employee_salary", "assessment_log", "assessment_stats"):
+            for t in ("employees", "attendance", "reimbursement", "employee_salary", "assessment_log", "assessment_stats", "employee_salary_last_month", "employee_salary_this_month"):
                 try:
                     cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.{t}")
                     print(f"  表 {t}: {cur.fetchone()['c']} 行")

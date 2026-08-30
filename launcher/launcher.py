@@ -314,7 +314,7 @@ def ensure_db() -> dict:
             capture_output=True, text=True, timeout=90,
         )
         if r.returncode == 0:
-            return {"ok": True, "msg": "数据库已创建/校验完成（建库 + 6 张表）"}
+            return {"ok": True, "msg": "数据库已创建/校验完成（建库 + 8 张表，含 2 张工资表）"}
         err = (r.stderr or r.stdout or "").strip().splitlines()[-3:]
         return {"ok": False, "msg": "建库失败：\n" + "\n".join(err)}
     except subprocess.TimeoutExpired:
@@ -559,7 +559,7 @@ SETUP_HTML = """<!DOCTYPE html>
     </form>
     <div class="note">
       前提：你本机已安装并启动了 <code>MySQL 8.0+</code>。没有的话先安装 MySQL 并记住 root 密码。<br>
-      提交后启动器会执行 <code>CREATE DATABASE</code> + 建 5 张表，然后回到控制台一键启动前后端。
+      提交后启动器会执行 <code>CREATE DATABASE</code> + 建 8 张表（含 2 张工资表），然后回到控制台一键启动前后端。
     </div>
   </div>
 </div>
