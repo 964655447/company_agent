@@ -842,7 +842,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 fwd_headers[k] = v
             fwd_headers["Host"] = f"127.0.0.1:{BACKEND_PORT}"
             req = urllib.request.Request(target, data=body, headers=fwd_headers, method=method)
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:  # Dify Agent+工具调用可能需 30~60s，留足余量
                 status = resp.status
                 resp_body = resp.read()
                 ctype = resp.headers.get("Content-Type", "application/octet-stream")
