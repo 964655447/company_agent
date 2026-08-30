@@ -6,7 +6,7 @@ const TOKEN_KEY = "cm_token", USER_KEY = "cm_user";
 
 const $ = (sel) => document.querySelector(sel);
 const state = { user: null, rosterEditing: null, attPeriod: "week", adminAttPeriod: "week",
-                floatConvId: null, chatConvId: null };
+                chatConvId: null };
 
 /* 转义 HTML 后保留换行，便于展示多行回答 */
 function renderText(s) {
@@ -83,6 +83,42 @@ function closeModal(val) {
   document.body.classList.remove("no-scroll");
   if (_modalResolve) { _modalResolve(val); _modalResolve = null; }
 }
+
+/* ---------------- 材料信息查看弹窗 ---------------- */
+function openMaterialModal(record) {
+  const raw = record?.ocr_raw || "";
+  const [statusTxt] = REIMB_STATUS[record.status] || [record.status];
+  $("#material-modal-title").textContent = `报销单 #${record.id} · 材料信息`;
+  $("#material-modal-sub").textContent = `提交于 ${fmtDT(record.submit_time)} · 状态：${statusTxt}`;
+
+  // 尝试美化 JSON；失败则按原文本展示
+  let pretty = raw;
+  if (raw) {
+    try {
+      const obj = JSON.parse(raw);
+      pretty = JSON.stringify(obj, null, 2);
+    } catch (e) { /* 保留原文 */ }
+  }
+  const body = $("#material-modal-body");
+  body.innerHTML = raw
+    ? `<pre class="material-raw">${esc(pretty)}</pre>`
+    : `<div class="material-empty">该报销单暂无材料信息（ocr_raw 为空）</div>`;
+
+  $("#material-modal-backdrop").classList.add("show");
+  document.body.classList.add("no-scroll");
+}
+function closeMaterialModal() {
+  $("#material-modal-backdrop").classList.remove("show");
+  document.body.classList.remove("no-scroll");
+}
+$("#material-modal-close").addEventListener("click", closeMaterialModal);
+$("#material-modal-ok").addEventListener("click", closeMaterialModal);
+$("#material-modal-backdrop").addEventListener("click", (e) => {
+  if (e.target.id === "material-modal-backdrop") closeMaterialModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && $("#material-modal-backdrop").classList.contains("show")) closeMaterialModal();
+});
 $("#modal-cancel").addEventListener("click", () => closeModal(false));
 $("#modal-ok").addEventListener("click", () => closeModal(true));
 $("#modal-backdrop").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") closeModal(false); });
@@ -155,7 +191,6 @@ function enterApp(user) {
   state.user = user;
   $("#login-page").classList.add("hidden");
   $("#app-page").classList.remove("hidden");
-  $("#float-bubble").classList.remove("hidden");
   $("#user-name").textContent = `${user.name}（${user.role === "manager" ? "管理者" : "员工"}）`;
   $("#user-dept").textContent = `${user.department} · ${user.position}`;
   $("#user-avatar").textContent = user.name.slice(0, 1);
@@ -283,17 +318,33 @@ $("#reimb-form").addEventListener("submit", async (e) => {
   finally { loading(btn, false); }
 });
 
+let lastMyReimbRows = [];
 async function loadMyReimb() {
   const data = await api("/api/reimbursement/my?emp_id=" + (state.user?.emp_id ?? ""));
   const rows = data.records || [];
+  lastMyReimbRows = rows;
   const tbody = rows.length ? rows.map((r) => {
     const [txt, cls] = REIMB_STATUS[r.status] || [r.status, "tag-gray"];
+    const raw = r.ocr_raw || "";
+    const preview = raw ? esc(raw.length > 24 ? raw.slice(0, 24) + "…" : raw) : '<span class="muted">—</span>';
     return `<tr><td>#${r.id}</td><td>${esc(r.category || "未填")}</td>
       <td style="text-align:right">${money(r.amount)}</td>
-      <td><span class="tag ${cls}">${txt}</span></td><td>${fmtDT(r.submit_time)}</td></tr>`;
-  }).join("") : '<tr class="empty"><td colspan="5">暂无报销记录</td></tr>';
-  $("#reimb-table").innerHTML = `<thead><tr><th>单号</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th></tr></thead><tbody>${tbody}</tbody>`;
+      <td><span class="tag ${cls}">${txt}</span></td>
+      <td>${fmtDT(r.submit_time)}</td>
+      <td><button class="link-btn" data-mat="${r.id}" title="点击查看完整材料信息">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="mat-preview">${preview}</span>
+      </button></td></tr>`;
+  }).join("") : '<tr class="empty"><td colspan="6">暂无报销记录</td></tr>';
+  $("#reimb-table").innerHTML = `<thead><tr><th>单号</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th><th>材料信息</th></tr></thead><tbody>${tbody}</tbody>`;
 }
+
+$("#reimb-table").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-mat]"); if (!btn) return;
+  const id = Number(btn.dataset.mat);
+  const rec = (lastMyReimbRows || []).find((x) => Number(x.id) === id);
+  if (rec) openMaterialModal(rec);
+});
 
 /* ---------------- 工资 ---------------- */
 
@@ -400,9 +451,11 @@ async function loadAdminAttendance() {
   } catch (err) { console.error(err); }
 }
 
+let lastAdminReimbRows = [];
 async function loadAdminReimb() {
   try {
     const r = await api("/api/reimbursement/report");
+    lastAdminReimbRows = r.rows || [];
     $("#admin-reimb-stats").innerHTML =
       statCard("报销笔数", r.stats.total_count) +
       statCard("待审批", `<span style="color:${r.stats.pending_count ? "var(--warn)" : "var(--ok)"}">${r.stats.pending_count}</span>`) +
@@ -410,6 +463,8 @@ async function loadAdminReimb() {
       statCard("单笔最高", money(r.stats.max_amount), "元");
     const tbody = (r.rows || []).length ? r.rows.map((row) => {
       const [txt, cls] = REIMB_STATUS[row.status] || [row.status, "tag-gray"];
+      const raw = row.ocr_raw || "";
+      const preview = raw ? esc(raw.length > 24 ? raw.slice(0, 24) + "…" : raw) : '<span class="muted">—</span>';
       const act = ["submitted", "approving"].includes(row.status)
         ? `<div class="review-actions">
              <button class="btn-ok" data-review="${row.id}" data-action="approve">通过</button>
@@ -417,13 +472,25 @@ async function loadAdminReimb() {
            </div>` : "";
       return `<tr><td>#${row.id}</td><td>${esc(row.employee_name)}</td><td>${esc(row.category || "未填")}</td>
         <td style="text-align:right">${money(row.amount)}</td>
-        <td><span class="tag ${cls}">${txt}</span></td><td>${fmtDT(row.submit_time)}</td><td>${act}</td></tr>`;
-    }).join("") : '<tr class="empty"><td colspan="7">暂无数据</td></tr>';
-    $("#admin-reimb-table").innerHTML = `<thead><tr><th>单号</th><th>员工</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead><tbody>${tbody}</tbody>`;
+        <td><span class="tag ${cls}">${txt}</span></td><td>${fmtDT(row.submit_time)}</td>
+        <td><button class="link-btn" data-mat="${row.id}" title="点击查看完整材料信息">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="mat-preview">${preview}</span>
+        </button></td>
+        <td>${act}</td></tr>`;
+    }).join("") : '<tr class="empty"><td colspan="8">暂无数据</td></tr>';
+    $("#admin-reimb-table").innerHTML = `<thead><tr><th>单号</th><th>员工</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th><th>材料信息</th><th>操作</th></tr></thead><tbody>${tbody}</tbody>`;
   } catch (err) { console.error(err); }
 }
 
 $("#admin-reimb-table").addEventListener("click", async (e) => {
+  const matBtn = e.target.closest("[data-mat]");
+  if (matBtn && !e.target.closest("[data-review]")) {
+    const id = Number(matBtn.dataset.mat);
+    const rec = (lastAdminReimbRows || []).find((x) => Number(x.id) === id);
+    if (rec) openMaterialModal(rec);
+    return;
+  }
   const btn = e.target.closest("[data-review]"); if (!btn) return;
   const ok = await confirmModal(`确认${btn.dataset.action === "approve" ? "通过" : "驳回"}该报销单？`, "审批操作");
   if (!ok) return;
@@ -681,104 +748,3 @@ function openChatView() {
   const ci = $("#chat-input");
   if (ci) ci.focus();
 }
-
-/* ---------------- 悬浮考勤小助手 ---------------- */
-const floatGreeted = { done: false };
-
-function renderUserCard(user) {
-  if (!user) return "";
-  const roleText = user.role === "manager" ? "管理者" : "员工";
-  const idNo = (user.id !== undefined && user.id !== null) ? user.id : user.emp_id;
-  return `<div class="float-idcard">
-    <div class="float-idcard-title">当前登录身份</div>
-    <div class="float-idcard-row"><span>ID</span><b>${esc(idNo)}</b></div>
-    <div class="float-idcard-row"><span>工号</span><b>${esc(user.emp_id)}</b></div>
-    <div class="float-idcard-row"><span>姓名</span><b>${esc(user.name)}</b></div>
-    <div class="float-idcard-row"><span>部门</span><b>${esc(user.department)}</b></div>
-    <div class="float-idcard-row"><span>岗位</span><b>${esc(user.position)}</b></div>
-    <div class="float-idcard-row"><span>角色</span><b>${roleText}</b></div>
-  </div>`;
-}
-
-function floatTogglePanel(show) {
-  const p = $("#float-panel");
-  const open = (show !== undefined) ? show : p.classList.contains("hidden");
-  p.classList.toggle("hidden", !open);
-  if (open) {
-    const user = state.user;
-    if (user) {
-      $("#float-sub").textContent = `${esc(user.name)} · ${esc(user.department)} · ${esc(user.position)}`;
-    }
-    if (!floatGreeted.done) {
-      floatGreeted.done = true;
-      if (user) {
-        appendFloatMsg("bot", renderUserCard(user), true);
-        appendFloatMsg("bot", `你好，${esc(user.name)}！我是考勤小助手，已识别你的身份。点下方快捷问题或直接输入，比如「这个月我考勤多少天」。`);
-      } else {
-        appendFloatMsg("bot", "你好！我是考勤小助手，点下方快捷问题或直接输入。");
-      }
-    }
-    $("#float-input").focus();
-  }
-}
-
-function appendFloatMsg(role, text, isHtml = false) {
-  const log = $("#float-log");
-  const el = document.createElement("div");
-  el.className = "float-msg " + role;
-  el.innerHTML = isHtml ? text : esc(text);
-  log.appendChild(el);
-  log.scrollTop = log.scrollHeight;
-  return el;
-}
-
-function appendFloatTyping() {
-  const log = $("#float-log");
-  const el = document.createElement("div");
-  el.className = "float-msg bot";
-  el.innerHTML = '<span class="float-typing"><i></i><i></i><i></i></span>';
-  log.appendChild(el);
-  log.scrollTop = log.scrollHeight;
-  return el;
-}
-
-async function askAttendance(question) {
-  if (!question || !question.trim()) return;
-  appendFloatMsg("user", question.trim());
-  const typing = appendFloatTyping();
-  const sendBtn = $("#float-send");
-  sendBtn.disabled = true;
-  try {
-    const r = await api("/api/attendance/ask", {
-      method: "POST",
-      json: { question: question, conversation_id: state.floatConvId },
-    });
-    if (r.conversation_id) state.floatConvId = r.conversation_id;
-    typing.innerHTML = renderText(r.answer);
-  } catch (err) {
-    typing.innerHTML = "出错了：" + esc(err.message);
-  } finally {
-    sendBtn.disabled = false;
-    const log = $("#float-log");
-    log.scrollTop = log.scrollHeight;
-  }
-}
-
-$("#float-bubble").addEventListener("click", () => floatTogglePanel());
-$("#float-bubble").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
-});
-$("#float-close").addEventListener("click", () => floatTogglePanel(false));
-$("#float-quick").addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-q]");
-  if (btn) askAttendance(btn.dataset.q);
-});
-$("#float-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const v = $("#float-input").value;
-  $("#float-input").value = "";
-  askAttendance(v);
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("#float-panel").classList.contains("hidden")) floatTogglePanel(false);
-});

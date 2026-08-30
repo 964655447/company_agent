@@ -89,6 +89,7 @@ class Reimbursement(Base):
             "amount": round(self.amount, 2), "status": self.status,
             "approver_id": self.approver_id,
             "submit_time": self.submit_time.isoformat(),
+            "ocr_raw": self.ocr_raw or "",
         }
 
 

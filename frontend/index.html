@@ -284,34 +284,42 @@
   </main>
 </div>
 
-<!-- ================= 悬浮考勤小助手 ================= -->
-<div id="float-bubble" class="float-bubble hidden" title="考勤小助手" role="button" tabindex="0" aria-label="打开考勤小助手">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-  <span class="float-bubble-dot"></span>
-</div>
-
-<div id="float-panel" class="float-panel hidden" role="dialog" aria-label="考勤小助手">
-  <div class="float-head">
-    <div class="float-head-info">
-      <span class="float-head-ico">🕘</span>
-      <div>
-        <div class="float-title">考勤小助手</div>
-        <div class="float-sub" id="float-sub">问我考勤问题，秒回答案</div>
-      </div>
-    </div>
-    <button class="float-close" id="float-close" aria-label="关闭">×</button>
-  </div>
-  <div class="float-log" id="float-log" aria-live="polite"></div>
-  <div class="float-quick" id="float-quick">
-    <button data-q="这个月我考勤多少天？">这个月考勤多少天</button>
-    <button data-q="本月我迟到几次了？">本月迟到几次</button>
-    <button data-q="本周我的出勤情况怎么样？">本周出勤情况</button>
-  </div>
-  <form id="float-form" class="float-input-row">
-    <input id="float-input" placeholder="如：这个月我考勤多少天？" autocomplete="off">
-    <button type="submit" class="btn-primary btn-sm" id="float-send">发送</button>
-  </form>
-</div>
+<!-- ================= Dify 智能助手嵌入 ================= -->
+<script>
+  window.difyChatbotConfig = {
+    token: 'eV7STRbjEk90BA8b',
+    baseUrl: 'http://localhost',
+    routeSegment: 'agent',
+    inputs: {
+      // You can define the inputs from the Start node here
+      // key is the variable name
+      // e.g.
+      // name: "NAME"
+    },
+    systemVariables: {
+      // user_id: 'YOU CAN DEFINE USER ID HERE',
+      // conversation_id: 'YOU CAN DEFINE CONVERSATION ID HERE, IT MUST BE A VALID UUID',
+    },
+    userVariables: {
+      // avatar_url: 'YOU CAN DEFINE USER AVATAR URL HERE',
+      // name: 'YOU CAN DEFINE USER NAME HERE',
+    },
+  }
+</script>
+<script
+  src="http://localhost/embed.min.js"
+  id="eV7STRbjEk90BA8b"
+  defer>
+</script>
+<style>
+  #dify-chatbot-bubble-button {
+    background-color: #1C64F2 !important;
+  }
+  #dify-chatbot-bubble-window {
+    width: 24rem !important;
+    height: 40rem !important;
+  }
+</style>
 
 <!-- ================= 全局反馈层 ================= -->
 <div class="toast-wrap" id="toast-wrap" aria-live="polite" aria-atomic="true"></div>
@@ -327,6 +335,28 @@
     <div class="modal-actions">
       <button class="btn-ghost" id="modal-cancel">取消</button>
       <button class="btn-danger" id="modal-ok">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 材料信息查看弹窗 -->
+<div class="modal-backdrop" id="material-modal-backdrop">
+  <div class="modal modal-lg material-modal" role="dialog" aria-modal="true" aria-labelledby="material-modal-title">
+    <div class="material-modal-header">
+      <div class="material-modal-heading">
+        <span class="material-modal-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+        </span>
+        <div>
+          <h3 id="material-modal-title">材料信息</h3>
+          <p id="material-modal-sub" class="material-modal-sub"></p>
+        </div>
+      </div>
+      <button class="material-modal-close" id="material-modal-close" aria-label="关闭">×</button>
+    </div>
+    <div class="material-modal-body" id="material-modal-body"></div>
+    <div class="modal-actions material-modal-actions">
+      <button class="btn-primary" id="material-modal-ok">关 闭</button>
     </div>
   </div>
 </div>
