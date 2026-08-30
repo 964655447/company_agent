@@ -128,6 +128,26 @@ def run_schema(conn):
     print(msg)
 
 
+def ensure_tables_orm():
+    """ORM 兜底建表：以 app.models.Base 为单一事实来源（含 AssessmentStat），
+
+    在 run_schema 之后调用，覆盖 database.sql 万一缺表 / 某条 DDL 被静默吞掉的情形。
+    Base.metadata.create_all 默认 checkfirst=True，仅补建缺失表，幂等且不改动已有表。
+    """
+    try:
+        from sqlalchemy import create_engine
+        from app.models import Base
+    except Exception as e:
+        print(f"[orm] 跳过 ORM 兜底建表（import 失败：{e}）")
+        return
+    try:
+        engine = create_engine(DB_URL)
+        Base.metadata.create_all(bind=engine)
+        print("[orm] ORM 兜底建表完成（含 assessment_stats，已存在则自动跳过）")
+    except Exception as e:
+        print(f"[orm] ORM 兜底建表失败：{e}")
+
+
 def ensure_database(conn=None):
     """确保数据库与表存在（幂等）。返回结果 dict。
 
@@ -147,6 +167,7 @@ def ensure_database(conn=None):
             )
         conn.select_db(DB_NAME)
         run_schema(conn)
+        ensure_tables_orm()
         return {"ok": True, "msg": f"数据库 {DB_NAME} 已就绪（建库/建表完成）"}
     except Exception as e:
         return {"ok": False, "msg": f"数据库初始化失败: {e}"}
@@ -488,8 +509,11 @@ def main():
             gen_attendance(conn)
         with conn.cursor() as cur:
             for t in ("employees", "attendance", "reimbursement", "employee_salary", "assessment_log", "assessment_stats"):
-                cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.{t}")
-                print(f"  表 {t}: {cur.fetchone()['c']} 行")
+                try:
+                    cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.{t}")
+                    print(f"  表 {t}: {cur.fetchone()['c']} 行")
+                except Exception as e:
+                    print(f"  表 {t}: 查询失败（{e}）")
     finally:
         conn.close()
 

@@ -314,7 +314,7 @@ def ensure_db() -> dict:
             capture_output=True, text=True, timeout=90,
         )
         if r.returncode == 0:
-            return {"ok": True, "msg": "数据库已创建/校验完成（建库 + 5 张表）"}
+            return {"ok": True, "msg": "数据库已创建/校验完成（建库 + 6 张表）"}
         err = (r.stderr or r.stdout or "").strip().splitlines()[-3:]
         return {"ok": False, "msg": "建库失败：\n" + "\n".join(err)}
     except subprocess.TimeoutExpired:

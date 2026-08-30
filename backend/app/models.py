@@ -4,7 +4,7 @@ from datetime import datetime, date
 
 from sqlalchemy import (
     Column, Integer, BigInteger, String, Text, DateTime, Date, Boolean,
-    Float, UniqueConstraint, Index,
+    Float, UniqueConstraint, Index, text,
 )
 
 from .database import Base
@@ -147,8 +147,9 @@ class AssessmentStat(Base):
     target_position = Column(String(50), nullable=True)
     score = Column(Float, nullable=True)
     test_time = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.now)
-    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, nullable=False, default=datetime.now, server_default=text("CURRENT_TIMESTAMP"))
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now,
+                        server_default=text("CURRENT_TIMESTAMP"), server_onupdate=text("CURRENT_TIMESTAMP"))
 
     def to_dict(self) -> dict:
         return {
