@@ -129,3 +129,33 @@ class AssessmentLog(Base):
     employee_id = Column(BigInteger, nullable=False)
     position_queried = Column(String(64), nullable=False)
     queried_at = Column(DateTime, nullable=False, default=datetime.now)
+
+    def to_dict(self) -> dict:
+        return {
+            "employee_id": self.employee_id,
+            "position_queried": self.position_queried,
+            "queried_at": self.queried_at.isoformat(),
+        }
+
+
+class AssessmentStat(Base):
+    __tablename__ = "assessment_stats"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    employee_id = Column(BigInteger, nullable=False, index=True)
+    original_position = Column(String(50), nullable=True)
+    target_position = Column(String(50), nullable=True)
+    score = Column(Float, nullable=True)
+    test_time = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.now)
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "employee_id": self.employee_id,
+            "original_position": self.original_position,
+            "target_position": self.target_position,
+            "score": round(self.score, 1) if self.score is not None else None,
+            "test_time": self.test_time.isoformat() if self.test_time else None,
+        }

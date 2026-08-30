@@ -38,6 +38,7 @@ from datetime import date, datetime, timedelta
 BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
 SQL_PATH = ROOT_DIR / "contracts" / "database.sql"
+ASSESSMENT_SEED_SQL = ROOT_DIR / "contracts" / "assessment_stats_seed.sql"
 
 
 # ---------- 轻量读取 .env（不依赖 python-dotenv）----------
@@ -95,7 +96,7 @@ def run_schema(conn):
 
     每条 CREATE TABLE 均带 IF NOT EXISTS，已存在的表自动跳过；
     缺失的表会被创建。因此无论库处于什么状态（空/部分建表/完整），
-    调用本函数后都能保证 5 张表全部存在。
+    调用本函数后都能保证 6 张表全部存在。
     """
     sql = SQL_PATH.read_text(encoding="utf-8")
     stmts, buf = [], ""
@@ -391,18 +392,50 @@ def gen_demo_dataset(conn):
 def _reset_all(conn):
     with conn.cursor() as cur:
         cur.execute("SET FOREIGN_KEY_CHECKS=0")
-        for t in ("assessment_log", "reimbursement", "attendance", "employee_salary", "employees"):
+        for t in ("assessment_log", "reimbursement", "attendance", "employee_salary", "assessment_stats", "employees"):
             cur.execute(f"DELETE FROM {DB_NAME}.{t}")
             cur.execute(f"ALTER TABLE {DB_NAME}.{t} AUTO_INCREMENT=1")
         cur.execute("SET FOREIGN_KEY_CHECKS=1")
     conn.commit()
-    print("[reset] 已清空 5 张表")
+    print("[reset] 已清空 6 张表")
+
+
+def seed_assessment_stats(conn):
+    """从 contracts/assessment_stats_seed.sql 导入考核成绩（同事 advanced_db_init.sql 转换而来）。
+
+    幂等：assessment_stats 非空则跳过；种子文件缺失则跳过。
+    """
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.assessment_stats")
+        if cur.fetchone()["c"] > 0:
+            print("[seed] assessment_stats 已有数据，跳过")
+            return
+    if not ASSESSMENT_SEED_SQL.exists():
+        print(f"[seed] 未找到 {ASSESSMENT_SEED_SQL}，跳过考核成绩导入")
+        return
+    sql = ASSESSMENT_SEED_SQL.read_text(encoding="utf-8")
+    stmts, buf = [], ""
+    for line in sql.splitlines():
+        if line.strip().startswith("--"):
+            continue
+        buf += line + "\n"
+        if line.strip().endswith(";"):
+            stmts.append(buf.strip())
+            buf = ""
+    n = 0
+    with conn.cursor() as cur:
+        for s in stmts:
+            cur.execute(s)
+            n += 1
+    conn.commit()
+    print(f"[seed] 已导入考核成绩（{ASSESSMENT_SEED_SQL.name}，{n} 条 INSERT）")
 
 
 def seed_demo(conn, reset=False):
     if reset:
         _reset_all(conn)
     gen_demo_dataset(conn)
+    seed_assessment_stats(conn)
     print("[seed-demo] 演示数据生成完成")
 
 
@@ -419,7 +452,7 @@ def main():
         elif SEED_ATTENDANCE:
             gen_attendance(conn)
         with conn.cursor() as cur:
-            for t in ("employees", "attendance", "reimbursement", "employee_salary", "assessment_log"):
+            for t in ("employees", "attendance", "reimbursement", "employee_salary", "assessment_log", "assessment_stats"):
                 cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.{t}")
                 print(f"  表 {t}: {cur.fetchone()['c']} 行")
     finally:

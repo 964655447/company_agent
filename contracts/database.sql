@@ -77,3 +77,17 @@ CREATE TABLE IF NOT EXISTS `assessment_log` (
   KEY `idx_asl_emp` (`employee_id`),
   CONSTRAINT `fk_asl_emp` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='考核查询日志';
+
+CREATE TABLE IF NOT EXISTS `assessment_stats` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `employee_id` bigint NOT NULL COMMENT '员工工号 → employees.employee_id',
+  `original_position` varchar(50) DEFAULT NULL COMMENT '原岗位',
+  `target_position` varchar(50) DEFAULT NULL COMMENT '意向岗位',
+  `score` decimal(5,1) DEFAULT NULL COMMENT '成绩',
+  `test_time` datetime DEFAULT NULL COMMENT '测试时间',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_as_emp` (`employee_id`),
+  CONSTRAINT `fk_as_emp` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='考核成绩表';

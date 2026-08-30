@@ -231,7 +231,7 @@ function switchView(id) {
   $("#hamburger").setAttribute("aria-expanded", "false");
   const loaders = {
     checkin: loadMyAttendance, reimb: loadMyReimb, salary: loadMySalary,
-    admin: () => loadAdminTab(currentAdminTab()), roster: loadRoster,
+    assess: loadMyScores, admin: () => loadAdminTab(currentAdminTab()), roster: loadRoster,
   };
   if (loaders[id]) loaders[id]();
   if (id === "chat") { openChatView(); }
@@ -403,6 +403,54 @@ $("#assess-form").addEventListener("submit", async (e) => {
   }
 });
 
+/* ---------------- 考核成绩 ---------------- */
+async function loadMyScores() {
+  const wrap = $("#assess-scores-wrap");
+  if (!wrap) return;
+  try {
+    const r = await api("/api/assessment/scores");
+    const list = r.scores || [];
+    if (!list.length) {
+      wrap.innerHTML = `<p class="form-tip">暂无考核成绩记录。</p>`;
+      return;
+    }
+    wrap.innerHTML = `
+      <div class="table-wrap"><table class="tbl">
+        <thead><tr><th>原岗位</th><th>意向岗位</th><th>成绩</th><th>测试时间</th></tr></thead>
+        <tbody>${list.map((s) => `
+          <tr><td>${esc(s.original_position || "-")}</td>
+              <td>${esc(s.target_position || "-")}</td>
+              <td>${s.score ?? "-"}</td>
+              <td>${s.test_time ? s.test_time.slice(0, 10) : "-"}</td></tr>`).join("")}
+        </tbody>
+      </table></div>`;
+  } catch (err) {
+    wrap.innerHTML = `<p style="color:var(--danger)">${esc(err.message)}</p>`;
+  }
+}
+
+async function loadAllScores() {
+  const el = $("#admin-scores-table");
+  if (!el) return;
+  const head = `<thead><tr><th>姓名</th><th>工号</th><th>原岗位</th><th>意向岗位</th><th>成绩</th><th>测试时间</th></tr></thead>`;
+  try {
+    const r = await api("/api/assessment/scores/all");
+    const list = r.scores || [];
+    el.innerHTML = head + (list.length
+      ? `<tbody>${list.map((s) => `
+          <tr><td>${esc(s.name || "-")}</td>
+              <td>${s.employee_id}</td>
+              <td>${esc(s.original_position || "-")}</td>
+              <td>${esc(s.target_position || "-")}</td>
+              <td>${s.score ?? "-"}</td>
+              <td>${s.test_time ? s.test_time.slice(0, 10) : "-"}</td></tr>`).join("")}
+        </tbody>`
+      : "");
+  } catch (err) {
+    el.innerHTML = head;
+  }
+}
+
 /* ---------------- 管理看板 ---------------- */
 function currentAdminTab() {
   const b = $("#admin-tabs .seg-btn.active");
@@ -428,7 +476,7 @@ async function loadAdminTab(tab) {
   if (tab === "att") loadAdminAttendance();
   if (tab === "reimb") loadAdminReimb();
   if (tab === "salary") loadAdminSalary();
-  if (tab === "assess") loadAdminAssess();
+  if (tab === "assess") { loadAdminAssess(); loadAllScores(); }
 }
 
 function statCard(label, value, sub) {
