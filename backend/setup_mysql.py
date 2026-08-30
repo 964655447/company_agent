@@ -5,7 +5,7 @@
   2. cp ../.env.example .env        （或首次启动启动器时网页填写数据库信息）
   3. pip install -r requirements.txt
   4. python setup_mysql.py                     # 自动建库 + 5 张表（幂等，可重复跑）
-  5.（可选）python setup_mysql.py --seed-demo         # 执行 contracts/seed.sql 灌入演示数据（幂等，已非空表跳过）
+  5.（可选）python setup_mysql.py --seed-demo         # 程序化生成演示数据（员工/考勤/薪资/报销/考核，幂等，已非空表跳过）
                                                   # 加 --reset 则先清空 5 张表再重灌
   6.（可选）python setup_mysql.py --seed-employees   # 需本机有花名册.xlsx
                                                   # 再设环境变量 SEED_ATTENDANCE=1 可生成演示考勤
@@ -233,35 +233,159 @@ def gen_attendance(conn):
 
 
 # ------------------------------------------------------------
-# 演示数据：从 contracts/seed.sql 读取确定性 SQL 并执行（非随机生成器）
+# 一键演示数据：程序化生成（不依赖外部 seed.sql / 花名册.xlsx）。
 # 用法：
-#   python setup_mysql.py --seed-demo            # 仅对空表造数（seed.sql 各段自带幂等守卫）
+#   python setup_mysql.py --seed-demo            # 对空表造数（各表自带幂等守卫，已非空跳过）
 #   python setup_mysql.py --seed-demo --reset    # 清空 5 张表后重新造数
-# 说明：数据全部写在 contracts/seed.sql（可被人工审查/修改），本函数只负责执行。
+# 说明：employees 为空时插入 27 名演示员工（工号 220401+，密码统一 123456）；
+#       其余表按现有员工生成考勤/薪资/报销/考核演示数据。全部幂等，重复跑不重复造。
 # ------------------------------------------------------------
-SEED_SQL_PATH = ROOT_DIR / "contracts" / "seed.sql"
+# 演示花名册（name, department, position, is_admin）。仅在 employees 为空时插入。
+DEMO_ROSTER = [
+    ("冯霞", "总经办", "总经理", True),
+    ("蒋博泺", "技术部", "技术经理", False),
+    ("许梦", "商务部", "营销专员", False),
+    ("张伟", "技术部", "开发工程师", False),
+    ("李娜", "人事部", "人事专员", False),
+    ("王芳", "财务部", "会计", False),
+    ("刘洋", "运营部", "运营专员", False),
+    ("陈静", "客服部", "客服专员", False),
+    ("杨磊", "车队", "车队长", False),
+    ("赵敏", "商务部", "营销经理", False),
+    ("孙强", "技术部", "开发工程师", False),
+    ("周婷", "人事部", "人事经理", False),
+    ("吴军", "财务部", "出纳", False),
+    ("郑昊", "运营部", "运营经理", False),
+    ("黄丽", "客服部", "客服经理", False),
+    ("马涛", "车队", "司机", False),
+    ("朱琳", "财务部", "财务总监", False),
+    ("胡斌", "技术部", "测试工程师", False),
+    ("郭倩", "商务部", "商务专员", False),
+    ("林峰", "运营部", "调度员", False),
+    ("何敏", "客服部", "客服专员", False),
+    ("高翔", "车队", "司机", False),
+    ("罗静", "人事部", "招聘专员", False),
+    ("梁宇", "技术部", "运维工程师", False),
+    ("宋佳", "商务部", "营销专员", False),
+    ("唐磊", "财务部", "审核", False),
+    ("韩雪", "总经办", "总经理助理", False),
+]
+ALL_DEPTS = ["总经办", "商务部", "技术部", "人事部", "财务部", "运营部", "客服部", "车队"]
+DEMO_SALARY_MAP = {
+    "总经理": 20000, "总经理助理": 12000, "商务总监": 15000, "运营总监": 15000,
+    "财务总监": 15000, "营销经理": 10000, "调度经理": 10000, "运营经理": 10000,
+    "客服经理": 10000, "总车队长": 12000, "车队长": 8000, "营销专员": 6000,
+    "调度专员": 6000, "运营专员": 6000, "客服专员": 6000, "车队文员": 5000,
+    "会计": 8000, "出纳": 6000, "审核": 7000, "技术经理": 14000, "开发工程师": 9000,
+    "测试工程师": 9000, "运维工程师": 9000, "人事经理": 9000, "人事专员": 6000,
+    "招聘专员": 6000, "商务专员": 6000, "调度员": 6000, "司机": 5000,
+}
+DEMO_SALARY_DEFAULT = 6000
 
 
-def seed_from_sql(conn):
-    if not SEED_SQL_PATH.exists():
-        print(f"[seed] 未找到 {SEED_SQL_PATH}，跳过（如需演示数据请确认 contracts/seed.sql 存在）")
-        return
-    sql = SEED_SQL_PATH.read_text(encoding="utf-8")
-    stmts, buf = [], ""
-    for line in sql.splitlines():
-        if line.strip().startswith("--"):
-            continue
-        buf += line + "\n"
-        if line.strip().endswith(";"):
-            stmts.append(buf.strip())
-            buf = ""
+def gen_demo_dataset(conn):
+    """一键生成自包含演示数据（employees 为空时插入演示员工，其余表按现有员工造数）。幂等。"""
+    import bcrypt
     with conn.cursor() as cur:
-        n = 0
-        for s in stmts:
-            cur.execute(s)
-            conn.commit()   # 每条提交一次：单条失败不影响前面已写入的数据
-            n += 1
-    print(f"[seed] 已执行 {n} 条演示数据 SQL（来自 contracts/seed.sql）")
+        # 1) employees（仅当空表时插入演示员工）
+        cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.employees")
+        if cur.fetchone()["c"] == 0:
+            ins = ("INSERT INTO employees (no, employee_id, name, password_hash, "
+                   "permissions, position, department) VALUES (%s,%s,%s,%s,%s,%s,%s)")
+            h = bcrypt.hashpw("123456".encode(), bcrypt.gensalt()).decode()
+            for i, (name, dept, pos, admin) in enumerate(DEMO_ROSTER):
+                perms = json.dumps(ALL_DEPTS if admin else [dept], ensure_ascii=False)
+                cur.execute(ins, (i + 1, 220401 + i, name, h, perms, pos, dept))
+            conn.commit()
+            print(f"[demo] 已插入 {len(DEMO_ROSTER)} 名演示员工（工号 220401+，密码统一 123456）")
+        else:
+            print("[demo] employees 已有数据，跳过")
+
+        cur.execute(
+            f"SELECT employee_id, name, position FROM {DB_NAME}.employees ORDER BY employee_id"
+        )
+        emps = cur.fetchall()
+        if not emps:
+            print("[demo] 无任何员工，无法继续生成其余演示数据")
+            return
+        emp_ids = [e["employee_id"] for e in emps]
+
+        # 2) attendance（当月工作日）
+        cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.attendance")
+        if cur.fetchone()["c"] == 0:
+            end = date.today()
+            d = date(end.year, end.month, 1)
+            workdays = []
+            while d <= end:
+                if d.weekday() < 5:
+                    workdays.append(d)
+                d += timedelta(days=1)
+            ins = ("INSERT INTO attendance (employee_id, checkin_time, type, is_late, work_date) "
+                   "VALUES (%s,%s,%s,%s,%s)")
+            n = 0
+            for eid in emp_ids:
+                for wd in workdays:
+                    late = random.random() < 0.12
+                    minute = random.randint(3, 42) if late else random.randint(0, 55)
+                    cin = datetime(wd.year, wd.month, wd.day, 9, minute)
+                    cur.execute(ins, (eid, cin, "clock_in", late, wd))
+                    cout = datetime(wd.year, wd.month, wd.day, 18, random.randint(0, 45))
+                    cur.execute(ins, (eid, cout, "clock_out", False, wd))
+                    n += 2
+            conn.commit()
+            print(f"[demo] 已生成考勤 {n} 条（{len(emp_ids)} 人 × {len(workdays)} 工作日）")
+        else:
+            print("[demo] attendance 已有数据，跳过")
+
+        # 3) employee_salary（每员工一行）
+        cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.employee_salary")
+        if cur.fetchone()["c"] == 0:
+            ins = ("INSERT INTO employee_salary (no, employee_id, name, position, "
+                   "base_salary, performance_rating, performance_bonus, allowance, gross_salary) "
+                   "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)")
+            for i, e in enumerate(emps):
+                base = DEMO_SALARY_MAP.get(e["position"], DEMO_SALARY_DEFAULT)
+                rating = round(random.uniform(0.85, 1.20), 2)
+                bonus = round(min(base * 0.4, 10000), 2)
+                allowance = 500.0
+                gross = round(base + bonus + allowance, 2)
+                cur.execute(ins, (i + 1, e["employee_id"], e["name"], e["position"],
+                                  base, rating, bonus, allowance, gross))
+            conn.commit()
+            print(f"[demo] 已生成薪资 {len(emps)} 条")
+        else:
+            print("[demo] employee_salary 已有数据，跳过")
+
+        # 4) reimbursement（随机抽取若干员工）
+        cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.reimbursement")
+        if cur.fetchone()["c"] == 0:
+            cats = ["差旅费", "餐饮费", "办公用品", "交通费", "培训费"]
+            stats = ["submitted", "approving", "approved", "rejected"]
+            ins = ("INSERT INTO reimbursement (employee_id, applicant_name, category, "
+                   "amount, status, approver_id) VALUES (%s,%s,%s,%s,%s,%s)")
+            n = 0
+            for e in random.sample(emps, min(8, len(emps))):
+                cur.execute(ins, (e["employee_id"], e["name"], random.choice(cats),
+                                  round(random.uniform(120, 2200), 2), random.choice(stats), None))
+                n += 1
+            conn.commit()
+            print(f"[demo] 已生成报销 {n} 条")
+        else:
+            print("[demo] reimbursement 已有数据，跳过")
+
+        # 5) assessment_log（随机抽取若干员工）
+        cur.execute(f"SELECT COUNT(*) c FROM {DB_NAME}.assessment_log")
+        if cur.fetchone()["c"] == 0:
+            poses = [e["position"] for e in emps]
+            ins = "INSERT INTO assessment_log (employee_id, position_queried) VALUES (%s,%s)"
+            n = 0
+            for e in random.sample(emps, min(6, len(emps))):
+                cur.execute(ins, (e["employee_id"], random.choice(poses)))
+                n += 1
+            conn.commit()
+            print(f"[demo] 已生成考核日志 {n} 条")
+        else:
+            print("[demo] assessment_log 已有数据，跳过")
 
 
 def _reset_all(conn):
@@ -278,7 +402,7 @@ def _reset_all(conn):
 def seed_demo(conn, reset=False):
     if reset:
         _reset_all(conn)
-    seed_from_sql(conn)
+    gen_demo_dataset(conn)
     print("[seed-demo] 演示数据生成完成")
 
 
