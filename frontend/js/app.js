@@ -1192,23 +1192,35 @@ function appendChatTyping() {
   return el;
 }
 
-async function sendChat(message) {
-  if (!message || !message.trim()) return;
-  appendChatMsg("user", renderText(message.trim()));
+async function sendChat(message, fileObj = null) {
+  if ((!message || !message.trim()) && !fileObj) return;
+  appendChatMsg("user", fileObj
+    ? `📎 ${esc(fileObj.name)}${message ? " · " + esc(message) : ""}`
+    : renderText(message.trim()));
   const typing = appendChatTyping();
   const btn = $("#chat-send");
   btn.disabled = true;
   try {
-    const r = await api("/api/chat", {
-      method: "POST",
-      json: { message: message, conversation_id: state.chatConvId },
-    });
+    let r;
+    if (fileObj) {
+      const fd = new FormData();
+      if (message && message.trim()) fd.append("message", message.trim());
+      if (state.chatConvId) fd.append("conversation_id", state.chatConvId);
+      fd.append("file", fileObj);
+      r = await api("/api/chat/file", { method: "POST", body: fd });
+    } else {
+      r = await api("/api/chat", {
+        method: "POST",
+        json: { message: message, conversation_id: state.chatConvId },
+      });
+    }
     if (r.conversation_id) state.chatConvId = r.conversation_id;
     typing.innerHTML = renderText(r.reply);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
   } finally {
     btn.disabled = false;
+    clearChatFile(); // 发送后清掉已选文件
     const log = $("#chat-log");
     log.scrollTop = log.scrollHeight;
   }
@@ -1218,11 +1230,34 @@ $("#chat-welcome").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-q]");
   if (btn) sendChat(btn.dataset.q);
 });
+
+/* 📎 智能助手页文件发送（复用 .float-attach / .float-file-chip 样式与 /api/chat/file 接口） */
+const chatFileInput = $("#chat-file");
+const chatFileChip = $("#chat-file-chip");
+const chatFileChipName = $("#chat-file-chip-name");
+function clearChatFile() {
+  if (!chatFileInput) return;
+  chatFileInput.value = "";
+  chatFileChip.classList.add("hidden");
+  chatFileChipName.textContent = "";
+}
+function showChatFile(name) {
+  chatFileChipName.textContent = name;
+  chatFileChip.classList.remove("hidden");
+}
+$("#chat-attach").addEventListener("click", () => chatFileInput && chatFileInput.click());
+chatFileInput.addEventListener("change", () => {
+  const f = chatFileInput.files[0];
+  if (f) showChatFile(f.name); else clearChatFile();
+});
+$("#chat-file-chip-del").addEventListener("click", () => clearChatFile());
+
 $("#chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const v = $("#chat-input").value;
+  const f = chatFileInput.files[0];
   $("#chat-input").value = "";
-  sendChat(v);
+  if (v.trim() || f) sendChat(v, f || null); // 有文件就走 /api/chat/file
 });
 
 function openChatView() {

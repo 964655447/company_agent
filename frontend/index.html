@@ -239,10 +239,18 @@
             </div>
           </div>
         </div>
+        <!-- 已选文件预览条（选文件后显示，位于输入行上方） -->
+        <div class="float-file-chip hidden" id="chat-file-chip">
+          <span class="float-file-chip-name" id="chat-file-chip-name"></span>
+          <button type="button" class="float-file-chip-del" id="chat-file-chip-del" title="移除文件">×</button>
+        </div>
         <form id="chat-form" class="chat-input-row">
-          <input id="chat-input" placeholder="问问智能助手，例如：这个月我迟到几次？" autocomplete="off">
+          <button type="button" class="float-attach" id="chat-attach" title="上传文件（试卷 / 文档 / 图片）">📎</button>
+          <input id="chat-input" placeholder="问问智能助手，或附上文件…" autocomplete="off">
           <button type="submit" class="btn-primary btn-sm" id="chat-send">发送</button>
         </form>
+        <!-- 隐藏的文件选择器（由 📎 按钮触发） -->
+        <input type="file" id="chat-file" class="hidden" accept=".doc,.docx,.pdf,.txt,.xls,.xlsx,.png,.jpg,.jpeg,.csv">
       </div>
     </section>
     <!-- 管理看板（管理者） -->

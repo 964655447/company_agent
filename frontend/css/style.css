@@ -848,7 +848,7 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 }
 .chat-quick button:hover { background: #6355f7; color: #fff; border-color: #6355f7; }
 .chat-input-row {
-  display: flex; gap: 10px; padding: 12px 16px 16px; background: #f8f9fc;
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px 16px; background: #f8f9fc;
   border-top: 1px solid rgba(17,24,39,.06);
 }
 .chat-input-row input {
