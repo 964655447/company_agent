@@ -104,17 +104,15 @@ def my_salary(
     user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    start, end = _salary_period_range(period, target_month)
-    cond = [Salary.employee_id == user.employee_id]
-    if start:
-        cond.append(Salary.created_at >= datetime.combine(start, datetime.time.min))
-    if end:
-        cond.append(Salary.created_at <= datetime.combine(end, datetime.time.max))
-    rows = db.scalars(select(Salary).where(*cond).order_by(Salary.created_at.desc())).all()
+    # 工资表为静态快照（每人一条），无 created_at 时间戳，
+    # period 参数保留兼容前端统一筛选 UI，但不做时间过滤。
+    rows = db.scalars(
+        select(Salary).where(Salary.employee_id == user.employee_id)
+    ).all()
     return {
         "records": [r.to_dict() for r in rows],
-        "range_start": str(start) if start else "",
-        "range_end": str(end) if end else "",
+        "range_start": "",
+        "range_end": "",
     }
 
 
@@ -168,12 +166,10 @@ async def salary_report(
     else:
         visible = {e.employee_id: e for e in emps
                    if e.position in perms or e.employee_id == manager.employee_id}
+    # 工资表为静态快照（每人一条），无 created_at 时间戳，
+    # period 参数保留兼容前端统一筛选 UI，但不做时间过滤。
     cond = [Salary.employee_id.in_(visible.keys())]
-    if start:
-        cond.append(Salary.created_at >= datetime.combine(start, datetime.time.min))
-    if end:
-        cond.append(Salary.created_at <= datetime.combine(end, datetime.time.max))
-    rows = db.scalars(select(Salary).where(*cond).order_by(Salary.created_at.desc())).all()
+    rows = db.scalars(select(Salary).where(*cond)).all()
     totals = [r.gross_salary for r in rows]
     stats = {
         "slip_count": len(rows),

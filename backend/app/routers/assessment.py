@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -75,9 +75,9 @@ def stats(
     q = select(AssessmentLog.position_queried, Employee.name, func.count(AssessmentLog.id)) \
         .join(Employee, AssessmentLog.employee_id == Employee.employee_id)
     if start:
-        q = q.where(AssessmentLog.created_at >= datetime.combine(start, datetime.time.min))
+        q = q.where(AssessmentLog.created_at >= datetime.combine(start, time.min))
     if end:
-        q = q.where(AssessmentLog.created_at <= datetime.combine(end, datetime.time.max))
+        q = q.where(AssessmentLog.created_at <= datetime.combine(end, time.max))
     rows = db.execute(
         q.group_by(AssessmentLog.position_queried, Employee.name)
          .order_by(func.count(AssessmentLog.id).desc())
@@ -102,9 +102,9 @@ def my_scores(
         .join(Employee, AssessmentStat.employee_id == Employee.employee_id) \
         .where(AssessmentStat.employee_id == user.employee_id)
     if start:
-        q = q.where(AssessmentStat.test_time >= datetime.combine(start, datetime.time.min))
+        q = q.where(AssessmentStat.test_time >= datetime.combine(start, time.min))
     if end:
-        q = q.where(AssessmentStat.test_time <= datetime.combine(end, datetime.time.max))
+        q = q.where(AssessmentStat.test_time <= datetime.combine(end, time.max))
     rows = db.execute(q.order_by(AssessmentStat.test_time.desc())).all()
     return {
         "scores": [{"name": r[1], **r[0].to_dict()} for r in rows],
@@ -125,9 +125,9 @@ def all_scores(
     q = select(AssessmentStat, Employee.name) \
         .join(Employee, AssessmentStat.employee_id == Employee.employee_id)
     if start:
-        q = q.where(AssessmentStat.test_time >= datetime.combine(start, datetime.time.min))
+        q = q.where(AssessmentStat.test_time >= datetime.combine(start, time.min))
     if end:
-        q = q.where(AssessmentStat.test_time <= datetime.combine(end, datetime.time.max))
+        q = q.where(AssessmentStat.test_time <= datetime.combine(end, time.max))
     rows = db.execute(q.order_by(AssessmentStat.employee_id, AssessmentStat.test_time.desc())).all()
     return {
         "scores": [{"name": r[1], **r[0].to_dict()} for r in rows],
