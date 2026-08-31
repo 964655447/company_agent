@@ -1,15 +1,43 @@
 import json
 import datetime
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Employee, Reimbursement
+from ..security import require_manager
 
 router = APIRouter(prefix="/api/reimbursement", tags=["费用报销"])
+
+
+def _reimb_period_range(period: str, target_month: str | None):
+    """报销周期 → (start_date, end_date)，基于 submit_time 过滤。"""
+    today = date.today()
+    if period == "week":
+        start = today - timedelta(days=today.weekday())
+        return start, today
+    if period == "month":
+        return today.replace(day=1), today
+    if period == "last_month":
+        first_this = today.replace(day=1)
+        end_last = first_this - timedelta(days=1)
+        return end_last.replace(day=1), end_last
+    if period == "all":
+        return None, None
+    if period == "specific" and target_month and len(target_month) == 7:
+        y, m = target_month.split("-")
+        first = date(int(y), int(m), 1)
+        if m == "12":
+            last = first.replace(year=first.year + 1, month=1) - timedelta(days=1)
+        else:
+            last = first.replace(month=int(m) + 1) - timedelta(days=1)
+        return first, last
+    # 默认本月
+    return today.replace(day=1), today
 
 
 def _resolve_employee_id(db: Session, emp_id: str):
@@ -63,7 +91,12 @@ async def submit(
 
 
 @router.get("/my")
-def my_reimbursements(emp_id: str = "", db: Session = Depends(get_db)):
+def my_reimbursements(
+    period: str = Query("month", pattern="^(week|month|last_month|all|specific)$"),
+    target_month: str | None = Query(None),
+    emp_id: str = "", db: Session = Depends(get_db),
+):
+    start, end = _reimb_period_range(period, target_month)
     q = select(Reimbursement)
     if emp_id:
         try:
@@ -72,8 +105,16 @@ def my_reimbursements(emp_id: str = "", db: Session = Depends(get_db)):
                 q = q.where(Reimbursement.employee_id == emp.employee_id)
         except (ValueError, TypeError):
             pass
+    if start:
+        q = q.where(Reimbursement.submit_time >= datetime.datetime.combine(start, datetime.time.min))
+    if end:
+        q = q.where(Reimbursement.submit_time <= datetime.datetime.combine(end, datetime.time.max))
     rows = db.scalars(q.order_by(Reimbursement.submit_time.desc())).all()
-    return {"records": [r.to_dict() for r in rows]}
+    return {
+        "records": [r.to_dict() for r in rows],
+        "range_start": str(start) if start else "",
+        "range_end": str(end) if end else "",
+    }
 
 
 class ReviewIn(BaseModel):
@@ -97,12 +138,21 @@ def review(ticket_id: int, body: ReviewIn, db: Session = Depends(get_db)):
 
 
 @router.get("/report")
-async def reimbursement_report(db: Session = Depends(get_db)):
+async def reimbursement_report(
+    period: str = Query("month", pattern="^(week|month|last_month|all|specific)$"),
+    target_month: str | None = Query(None),
+    manager: Employee = Depends(require_manager),
+    db: Session = Depends(get_db),
+):
+    start, end = _reimb_period_range(period, target_month)
     emps = db.scalars(select(Employee)).all()
     visible_ids = {e.employee_id: e for e in emps}
-    rows = db.scalars(select(Reimbursement).where(
-        Reimbursement.employee_id.in_(visible_ids.keys()),
-    ).order_by(Reimbursement.submit_time.desc())).all()
+    cond = [Reimbursement.employee_id.in_(visible_ids.keys())]
+    if start:
+        cond.append(Reimbursement.submit_time >= datetime.datetime.combine(start, datetime.time.min))
+    if end:
+        cond.append(Reimbursement.submit_time <= datetime.datetime.combine(end, datetime.time.max))
+    rows = db.scalars(select(Reimbursement).where(*cond).order_by(Reimbursement.submit_time.desc())).all()
 
     pending = [r for r in rows if r.status in ("submitted", "approving")]
     amounts = [r.amount for r in rows]
@@ -112,8 +162,10 @@ async def reimbursement_report(db: Session = Depends(get_db)):
         "total_amount": sum(amounts),
         "max_amount": max(amounts) if amounts else 0,
     }
-    period = f"{datetime.date.today():%Y-%m}"
     return {
+        "period": period,
+        "range_start": str(start) if start else "",
+        "range_end": str(end) if end else "",
         "rows": [{**r.to_dict(), "employee_name": visible_ids[r.employee_id].name if r.employee_id in visible_ids else ""}
                  for r in rows],
         "stats": stats,

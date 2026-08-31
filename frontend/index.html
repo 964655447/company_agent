@@ -121,7 +121,16 @@
           </form>
         </div>
         <div class="card">
-          <div class="card-head"><h3>我的报销进度</h3></div>
+          <div class="card-head">
+            <h3>我的报销进度</h3>
+            <div class="seg" id="reimb-period">
+              <button class="seg-btn active" data-p="month">本月</button>
+              <button class="seg-btn" data-p="last_month">上月</button>
+              <button class="seg-btn" data-p="all">全部</button>
+              <input type="month" id="reimb-month" class="att-month-picker" title="查看历史某月">
+            </div>
+          </div>
+          <div id="reimb-range" class="range-label"></div>
           <div class="table-wrap"><table class="tbl" id="reimb-table"></table></div>
         </div>
       </div>
@@ -132,7 +141,16 @@
       <h2 class="view-title">工资核算</h2>
       <div id="salary-result"></div>
       <div class="card">
-        <div class="card-head"><h3>历史工资条</h3></div>
+        <div class="card-head">
+          <h3>历史工资条</h3>
+          <div class="seg" id="salary-period">
+            <button class="seg-btn active" data-p="month">本月</button>
+            <button class="seg-btn" data-p="last_month">上月</button>
+            <button class="seg-btn" data-p="all">全部</button>
+            <input type="month" id="salary-month" class="att-month-picker" title="查看历史某月">
+          </div>
+        </div>
+        <div id="salary-range" class="range-label"></div>
         <div class="table-wrap"><table class="tbl" id="salary-table"></table></div>
       </div>
     </section>
@@ -158,7 +176,16 @@
       </div>
       <div id="assess-result"></div>
       <div class="card">
-        <div class="card-head"><h3>我的考核成绩</h3></div>
+        <div class="card-head">
+          <h3>我的考核成绩</h3>
+          <div class="seg" id="assess-period">
+            <button class="seg-btn active" data-p="month">本月</button>
+            <button class="seg-btn" data-p="last_month">上月</button>
+            <button class="seg-btn" data-p="all">全部</button>
+            <input type="month" id="assess-month" class="att-month-picker" title="查看历史某月">
+          </div>
+        </div>
+        <div id="assess-range" class="range-label"></div>
         <div id="assess-scores-wrap"><p class="form-tip">加载中…</p></div>
       </div>
     </section>
@@ -215,6 +242,15 @@
       </div>
 
       <div id="admin-reimb" class="admin-pane hidden">
+        <div class="card-head-inline">
+          <div class="seg" id="admin-reimb-period">
+            <button class="seg-btn active" data-p="month">本月</button>
+            <button class="seg-btn" data-p="last_month">上月</button>
+            <button class="seg-btn" data-p="all">全部</button>
+          </div>
+          <input type="month" id="admin-reimb-month" class="att-month-picker" title="查看历史某月">
+        </div>
+        <div id="admin-reimb-range" class="range-label"></div>
         <div id="admin-reimb-stats" class="stat-row"></div>
         <div class="card">
           <div class="card-head"><h3>报销单列表</h3></div>
@@ -223,6 +259,15 @@
       </div>
 
       <div id="admin-salary" class="admin-pane hidden">
+        <div class="card-head-inline">
+          <div class="seg" id="admin-salary-period">
+            <button class="seg-btn active" data-p="month">本月</button>
+            <button class="seg-btn" data-p="last_month">上月</button>
+            <button class="seg-btn" data-p="all">全部</button>
+          </div>
+          <input type="month" id="admin-salary-month" class="att-month-picker" title="查看历史某月">
+        </div>
+        <div id="admin-salary-range" class="range-label"></div>
         <div id="admin-salary-stats" class="stat-row"></div>
         <div class="card">
           <div class="card-head"><h3>工资明细</h3></div>
@@ -252,6 +297,15 @@
       </div>
 
       <div id="admin-assess" class="admin-pane hidden">
+        <div class="card-head-inline">
+          <div class="seg" id="admin-assess-period">
+            <button class="seg-btn active" data-p="month">本月</button>
+            <button class="seg-btn" data-p="last_month">上月</button>
+            <button class="seg-btn" data-p="all">全部</button>
+          </div>
+          <input type="month" id="admin-assess-month" class="att-month-picker" title="查看历史某月">
+        </div>
+        <div id="admin-assess-range" class="range-label"></div>
         <div class="card">
           <div class="card-head"><h3>下属岗位查询动态</h3></div>
           <div class="table-wrap"><table class="tbl" id="admin-assess-table"></table></div>

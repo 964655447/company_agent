@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,6 +12,29 @@ from ..models import Employee, Salary
 from ..security import get_current_user, require_manager
 
 router = APIRouter(prefix="/api/salary", tags=["工资"])
+
+
+def _salary_period_range(period: str, target_month: str | None):
+    """工资周期 → (start, end)，基于 created_at 过滤。"""
+    today = date.today()
+    if period == "week":
+        start = today - timedelta(days=today.weekday())
+        return start, today
+    if period == "month":
+        return today.replace(day=1), today
+    if period == "last_month":
+        first_this = today.replace(day=1)
+        end_last = first_this - timedelta(days=1)
+        return end_last.replace(day=1), end_last
+    if period == "all":
+        return None, None
+    if period == "specific" and target_month and len(target_month) == 7:
+        y, m = target_month.split("-")
+        first = date(int(y), int(m), 1)
+        last = (first.replace(month=int(m) + 1) - timedelta(days=1)) if int(m) < 12 else \
+              first.replace(year=first.year + 1, month=1) - timedelta(days=1)
+        return first, last
+    return today.replace(day=1), today
 
 # 绩效奖金上限（元）
 PERF_BONUS_CAP = 10000.0
@@ -75,12 +98,24 @@ async def submit_performance(body: PerformanceIn,
 
 
 @router.get("/my")
-def my_salary(user: Employee = Depends(get_current_user),
-              db: Session = Depends(get_db)):
-    rows = db.scalars(select(Salary).where(
-        Salary.employee_id == user.employee_id,
-    )).all()
-    return {"records": [r.to_dict() for r in rows]}
+def my_salary(
+    period: str = Query("month", pattern="^(week|month|last_month|all|specific)$"),
+    target_month: str | None = Query(None),
+    user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    start, end = _salary_period_range(period, target_month)
+    cond = [Salary.employee_id == user.employee_id]
+    if start:
+        cond.append(Salary.created_at >= datetime.combine(start, datetime.time.min))
+    if end:
+        cond.append(Salary.created_at <= datetime.combine(end, datetime.time.max))
+    rows = db.scalars(select(Salary).where(*cond).order_by(Salary.created_at.desc())).all()
+    return {
+        "records": [r.to_dict() for r in rows],
+        "range_start": str(start) if start else "",
+        "range_end": str(end) if end else "",
+    }
 
 
 class SalaryUpsert(BaseModel):
@@ -119,8 +154,13 @@ async def upsert_salary(emp_id: str, body: SalaryUpsert,
 
 
 @router.get("/report")
-async def salary_report(manager: Employee = Depends(require_manager),
-                        db: Session = Depends(get_db)):
+async def salary_report(
+    period: str = Query("month", pattern="^(week|month|last_month|all|specific)$"),
+    target_month: str | None = Query(None),
+    manager: Employee = Depends(require_manager),
+    db: Session = Depends(get_db),
+):
+    start, end = _salary_period_range(period, target_month)
     perms = set(manager.permission_list)
     emps = db.scalars(select(Employee)).all()
     if len(perms) >= 5:
@@ -128,9 +168,12 @@ async def salary_report(manager: Employee = Depends(require_manager),
     else:
         visible = {e.employee_id: e for e in emps
                    if e.position in perms or e.employee_id == manager.employee_id}
-    rows = db.scalars(select(Salary).where(
-        Salary.employee_id.in_(visible.keys()),
-    )).all()
+    cond = [Salary.employee_id.in_(visible.keys())]
+    if start:
+        cond.append(Salary.created_at >= datetime.combine(start, datetime.time.min))
+    if end:
+        cond.append(Salary.created_at <= datetime.combine(end, datetime.time.max))
+    rows = db.scalars(select(Salary).where(*cond).order_by(Salary.created_at.desc())).all()
     totals = [r.gross_salary for r in rows]
     stats = {
         "slip_count": len(rows),
@@ -138,6 +181,9 @@ async def salary_report(manager: Employee = Depends(require_manager),
         "avg_pay": sum(totals) / len(totals) if totals else 0,
     }
     return {
+        "period": period,
+        "range_start": str(start) if start else "",
+        "range_end": str(end) if end else "",
         "rows": [{**r.to_dict(), "employee_name": r.name} for r in rows],
         "stats": stats,
     }

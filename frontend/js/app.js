@@ -7,6 +7,12 @@ const TOKEN_KEY = "cm_token", USER_KEY = "cm_user";
 const $ = (sel) => document.querySelector(sel);
 const state = { user: null, rosterEditing: null, attPeriod: "week", adminAttPeriod: "week",
                 attMonth: "", adminAttMonth: "",
+                reimbPeriod: "month", reimbMonth: "",
+                salaryPeriod: "month", salaryMonth: "",
+                assessPeriod: "month", assessMonth: "",
+                adminReimbPeriod: "month", adminReimbMonth: "",
+                adminSalaryPeriod: "month", adminSalaryMonth: "",
+                adminAssessPeriod: "month", adminAssessMonth: "",
                 floatConvId: null, chatConvId: null,
                 adminAttRows: [], adminAttPage: 1, adminAttPageSize: 20 };
 
@@ -294,6 +300,75 @@ $("#att-month").addEventListener("change", (e) => {
   loadMyAttendance();
 });
 
+/* ---- 报销周期 ---- */
+$("#reimb-period").addEventListener("click", (e) => {
+  const btn = e.target.closest(".seg-btn"); if (!btn) return;
+  state.reimbPeriod = btn.dataset.p; state.reimbMonth = "";
+  $("#reimb-month").value = "";
+  $("#reimb-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+  loadMyReimb();
+});
+$("#reimb-month").addEventListener("change", (e) => {
+  const v = e.target.value; if (!v) return;
+  state.reimbPeriod = "specific"; state.reimbMonth = v;
+  $("#reimb-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+  loadMyReimb();
+});
+
+/* ---- 工资周期 ---- */
+$("#salary-period").addEventListener("click", (e) => {
+  const btn = e.target.closest(".seg-btn"); if (!btn) return;
+  state.salaryPeriod = btn.dataset.p; state.salaryMonth = "";
+  $("#salary-month").value = "";
+  $("#salary-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+  loadMySalary();
+});
+$("#salary-month").addEventListener("change", (e) => {
+  const v = e.target.value; if (!v) return;
+  state.salaryPeriod = "specific"; state.salaryMonth = v;
+  $("#salary-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+  loadMySalary();
+});
+
+/* ---- 考核周期（员工） ---- */
+$("#assess-period").addEventListener("click", (e) => {
+  const btn = e.target.closest(".seg-btn"); if (!btn) return;
+  state.assessPeriod = btn.dataset.p; state.assessMonth = "";
+  $("#assess-month").value = "";
+  $("#assess-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+  loadMyScores();
+});
+$("#assess-month").addEventListener("change", (e) => {
+  const v = e.target.value; if (!v) return;
+  state.assessPeriod = "specific"; state.assessMonth = v;
+  $("#assess-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+  loadMyScores();
+});
+
+/* ---- 管理看板：报销/工资/考核 周期 ---- */
+["reimb", "salary", "assess"].forEach((mod) => {
+  $(`#admin-${mod}-period`).addEventListener("click", (e) => {
+    const btn = e.target.closest(".seg-btn"); if (!btn) return;
+    state[`admin${mod.charAt(0).toUpperCase() + mod.slice(1)}Period`] = btn.dataset.p;
+    state[`admin${mod.charAt(0).toUpperCase() + mod.slice(1)}Month`] = "";
+    $(`#admin-${mod}-month`).value = "";
+    $(`#admin-${mod}-period`).querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    if (mod === "reimb") loadAdminReimb();
+    else if (mod === "salary") loadAdminSalary();
+    else { loadAdminAssess(); loadAllScores(); }
+  });
+  $(`#admin-${mod}-month`).addEventListener("change", (e) => {
+    const v = e.target.value; if (!v) return;
+    const cap = mod.charAt(0).toUpperCase() + mod.slice(1);
+    state[`admin${cap}Period`] = "specific";
+    state[`admin${cap}Month`] = v;
+    $(`#admin-${mod}-period`).querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+    if (mod === "reimb") loadAdminReimb();
+    else if (mod === "salary") loadAdminSalary();
+    else { loadAdminAssess(); loadAllScores(); }
+  });
+});
+
 async function loadMyAttendance() {
   let url = `/api/attendance/my?period=${state.attPeriod}`;
   if (state.attPeriod === "specific" && state.attMonth) url += `&target_month=${state.attMonth}`;
@@ -335,9 +410,13 @@ $("#reimb-form").addEventListener("submit", async (e) => {
 
 let lastMyReimbRows = [];
 async function loadMyReimb() {
-  const data = await api("/api/reimbursement/my?emp_id=" + (state.user?.emp_id ?? ""));
+  let url = `/api/reimbursement/my?period=${state.reimbPeriod}&emp_id=${state.user?.emp_id ?? ""}`;
+  if (state.reimbPeriod === "specific" && state.reimbMonth) url += `&target_month=${state.reimbMonth}`;
+  const data = await api(url);
   const rows = data.records || [];
   lastMyReimbRows = rows;
+  const range = data.range_end ? `${data.range_start} ~ ${data.range_end}` : "";
+  $("#reimb-range").textContent = range ? `统计区间：${range}` : "";
   const tbody = rows.length ? rows.map((r) => {
     const [txt, cls] = REIMB_STATUS[r.status] || [r.status, "tag-gray"];
     const raw = r.ocr_raw || "";
@@ -380,8 +459,12 @@ function renderSlip(r) {
 }
 
 async function loadMySalary() {
-  const data = await api("/api/salary/my");
+  let url = `/api/salary/my?period=${state.salaryPeriod}`;
+  if (state.salaryPeriod === "specific" && state.salaryMonth) url += `&target_month=${state.salaryMonth}`;
+  const data = await api(url);
   const rows = data.records || [];
+  const range = data.range_end ? `${data.range_start} ~ ${data.range_end}` : "";
+  $("#salary-range").textContent = range ? `统计区间：${range}` : "";
   const tbody = rows.length ? rows.map((r) => `
     <tr><td>${esc(r.no)}</td><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${esc(r.position)}</td>
       <td style="text-align:right">${money(r.base_salary)}</td>
@@ -422,8 +505,12 @@ async function loadMyScores() {
   const wrap = $("#assess-scores-wrap");
   if (!wrap) return;
   try {
-    const r = await api("/api/assessment/scores");
+    let url = `/api/assessment/scores?period=${state.assessPeriod}`;
+    if (state.assessPeriod === "specific" && state.assessMonth) url += `&target_month=${state.assessMonth}`;
+    const r = await api(url);
     const list = r.scores || [];
+    const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : "";
+    $("#assess-range").textContent = range ? `统计区间：${range}` : "";
     if (!list.length) {
       wrap.innerHTML = `<p class="form-tip">暂无考核成绩记录。</p>`;
       return;
@@ -448,7 +535,9 @@ async function loadAllScores() {
   if (!el) return;
   const head = `<thead><tr><th>姓名</th><th>工号</th><th>原岗位</th><th>意向岗位</th><th>成绩</th><th>测试时间</th></tr></thead>`;
   try {
-    const r = await api("/api/assessment/scores/all");
+    let url = `/api/assessment/scores/all?period=${state.adminAssessPeriod}`;
+    if (state.adminAssessPeriod === "specific" && state.adminAssessMonth) url += `&target_month=${state.adminAssessMonth}`;
+    const r = await api(url);
     const list = r.scores || [];
     el.innerHTML = head + (list.length
       ? `<tbody>${list.map((s) => `
@@ -594,13 +683,17 @@ $("#admin-att-pager").addEventListener("change", (e) => {
 let lastAdminReimbRows = [];
 async function loadAdminReimb() {
   try {
-    const r = await api("/api/reimbursement/report");
+    let url = `/api/reimbursement/report?period=${state.adminReimbPeriod}`;
+    if (state.adminReimbPeriod === "specific" && state.adminReimbMonth) url += `&target_month=${state.adminReimbMonth}`;
+    const r = await api(url);
     lastAdminReimbRows = r.rows || [];
     $("#admin-reimb-stats").innerHTML =
       statCard("报销笔数", r.stats.total_count) +
       statCard("待审批", `<span style="color:${r.stats.pending_count ? "var(--warn)" : "var(--ok)"}">${r.stats.pending_count}</span>`) +
       statCard("合计金额", money(r.stats.total_amount), "元") +
       statCard("单笔最高", money(r.stats.max_amount), "元");
+    const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : "";
+    $("#admin-reimb-range").textContent = range ? `统计区间：${range}` : "";
     const tbody = (r.rows || []).length ? r.rows.map((row) => {
       const [txt, cls] = REIMB_STATUS[row.status] || [row.status, "tag-gray"];
       const raw = row.ocr_raw || "";
@@ -645,12 +738,16 @@ $("#admin-reimb-table").addEventListener("click", async (e) => {
 let lastSalaryRows = [];
 async function loadAdminSalary() {
   try {
-    const r = await api("/api/salary/report");
+    let url = `/api/salary/report?period=${state.adminSalaryPeriod}`;
+    if (state.adminSalaryPeriod === "specific" && state.adminSalaryMonth) url += `&target_month=${state.adminSalaryMonth}`;
+    const r = await api(url);
     lastSalaryRows = r.rows || [];
     $("#admin-salary-stats").innerHTML =
       statCard("工资条数", r.stats.slip_count) +
       statCard("工资总额", money(r.stats.total_payroll), "元") +
       statCard("平均工资", money(r.stats.avg_pay), "元");
+    const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : "";
+    $("#admin-salary-range").textContent = range ? `统计区间：${range}` : "";
     // (removed: #admin-salary-analysis element not in HTML)
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
       <tr data-id="${esc(row.id)}">
@@ -722,12 +819,16 @@ $("#salary-form").addEventListener("submit", async (e) => {
 
 async function loadAdminAssess() {
   try {
-    const r = await api("/api/assessment/stats");
+    let url = `/api/assessment/stats?period=${state.adminAssessPeriod}`;
+    if (state.adminAssessPeriod === "specific" && state.adminAssessMonth) url += `&target_month=${state.adminAssessMonth}`;
+    const r = await api(url);
     const tbody = (r.rows || []).length ? r.rows.map((row) => `
       <tr><td>${esc(row.name)}</td><td>${esc(row.position_queried)}</td>
       <td><span class="tag tag-info">${row.count} 次</span></td></tr>`).join("")
       : `<tr class="empty"><td colspan="3">${emptyHTML("暂无岗位查询记录")}</td></tr>`;
     $("#admin-assess-table").innerHTML = `<thead><tr><th>员工</th><th>查询岗位</th><th>次数</th></tr></thead><tbody>${tbody}</tbody>`;
+    const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : "";
+    $("#admin-assess-range").textContent = range ? `统计区间：${range}` : "";
   } catch (err) { console.error(err); }
 }
 
