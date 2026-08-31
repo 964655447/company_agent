@@ -88,6 +88,9 @@
           <div class="seg" id="att-period">
             <button class="seg-btn active" data-p="week">本周</button>
             <button class="seg-btn" data-p="month">本月</button>
+            <button class="seg-btn" data-p="last_month">上月</button>
+            <button class="seg-btn" data-p="all">全部</button>
+            <input type="month" id="att-month" class="att-month-picker" title="查看历史某月">
           </div>
         </div>
         <div class="table-wrap"><table class="tbl" id="att-table"></table></div>
@@ -197,8 +200,12 @@
           <div class="seg" id="admin-att-period">
             <button class="seg-btn active" data-p="week">本周</button>
             <button class="seg-btn" data-p="month">本月</button>
+            <button class="seg-btn" data-p="last_month">上月</button>
+            <button class="seg-btn" data-p="all">全部</button>
           </div>
+          <input type="month" id="admin-att-month" class="att-month-picker" title="查看历史某月">
         </div>
+        <div id="admin-att-range" class="range-label"></div>
         <div id="admin-att-stats" class="stat-row"></div>
         <div class="card">
           <div class="card-head"><h3>考勤明细</h3></div>

@@ -155,14 +155,18 @@ def checkin(body: CheckinIn, user: Employee = Depends(get_current_user),
 
 
 @router.get("/my")
-def my_attendance(period: str = Query(..., pattern="^(week|month)$"),
+def my_attendance(period: str = Query("week", pattern="^(week|month|last_month|all|specific)$"),
+                   target_month: str | None = Query(None),  # YYYY-MM，配合 period=specific
                    user: Employee = Depends(get_current_user),
                    db: Session = Depends(get_db)):
-    start = _period_start(period)
-    rows = db.scalars(select(Attendance).where(
-        Attendance.employee_id == user.employee_id,
-        Attendance.work_date >= start,
-    ).order_by(Attendance.checkin_time)).all()
+    start, end = _resolve_period_range(period, target_month, None, None)
+    conditions = [Attendance.employee_id == user.employee_id]
+    if start:
+        conditions.append(Attendance.work_date >= start)
+    if end:
+        conditions.append(Attendance.work_date <= end)
+    rows = db.scalars(select(Attendance).where(*conditions)
+                      .order_by(Attendance.checkin_time)).all()
     return {"records": [r.to_dict() for r in rows]}
 
 
@@ -258,13 +262,26 @@ def _resolve_period_range(period: str, target_date: str | None,
         end_last = first_this - timedelta(days=1)
         start_last = end_last.replace(day=1)
         return start_last, end_last
+    if period == "all":
+        # 历史全部：不做日期过滤
+        return None, None
     if period == "specific" and target_date:
+        if len(target_date) == 7:  # YYYY-MM → 整月
+            y, m = target_date.split("-")
+            first = date(int(y), int(m), 1)
+            return first, _last_day_of_month(first)
         d = date.fromisoformat(target_date)
         return d, d
     if period == "custom" and start_date and end_date:
         return date.fromisoformat(start_date), date.fromisoformat(end_date)
     # 默认本月
     return today.replace(day=1), today
+
+
+def _last_day_of_month(d: date) -> date:
+    if d.month == 12:
+        return d.replace(year=d.year + 1, month=1) - timedelta(days=1)
+    return d.replace(month=d.month + 1) - timedelta(days=1)
 
 
 @router.post("/query")
@@ -332,7 +349,8 @@ def attendance_query(body: QueryIn, db: Session = Depends(get_db)):
 
 
 @router.get("/report")
-async def attendance_report(period: str = Query("week", pattern="^(week|month)$"),
+async def attendance_report(period: str = Query("week", pattern="^(week|month|last_month|all|specific)$"),
+                            target_month: str | None = Query(None),  # YYYY-MM，配合 period=specific 查看历史某月
                             dept: str = Query(None),
                             manager: Employee = Depends(require_manager),
                             db: Session = Depends(get_db)):
@@ -349,10 +367,14 @@ async def attendance_report(period: str = Query("week", pattern="^(week|month)$"
     ids = [e.employee_id for e in visible]
     name_map = {e.employee_id: e.name for e in visible}
 
-    start = _period_start(period)
-    rows = db.scalars(select(Attendance).where(
-        Attendance.employee_id.in_(ids), Attendance.work_date >= start,
-    ).order_by(Attendance.checkin_time.desc())).all()
+    start, end = _resolve_period_range(period, target_month, None, None)
+    conditions = [Attendance.employee_id.in_(ids)]
+    if start:
+        conditions.append(Attendance.work_date >= start)
+    if end:
+        conditions.append(Attendance.work_date <= end)
+    rows = db.scalars(select(Attendance).where(*conditions)
+                      .order_by(Attendance.checkin_time.desc())).all()
 
     late_records = [r for r in rows if r.is_late]
     late_count = {}
@@ -369,7 +391,8 @@ async def attendance_report(period: str = Query("week", pattern="^(week|month)$"
     }
     return {
         "period": period,
-        "range_start": str(start),
+        "range_start": str(start) if start else "全部",
+        "range_end": str(end) if end else "",
         "rows": [{**r.to_dict(), "employee_name": name_map.get(r.employee_id, "")} for r in rows],
         "stats": stats,
     }

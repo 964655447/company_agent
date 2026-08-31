@@ -6,6 +6,7 @@ const TOKEN_KEY = "cm_token", USER_KEY = "cm_user";
 
 const $ = (sel) => document.querySelector(sel);
 const state = { user: null, rosterEditing: null, attPeriod: "week", adminAttPeriod: "week",
+                attMonth: "", adminAttMonth: "",
                 floatConvId: null, chatConvId: null,
                 adminAttRows: [], adminAttPage: 1, adminAttPageSize: 20 };
 
@@ -279,12 +280,24 @@ document.querySelectorAll("[data-checkin]").forEach((btn) =>
 $("#att-period").addEventListener("click", (e) => {
   const btn = e.target.closest(".seg-btn"); if (!btn) return;
   state.attPeriod = btn.dataset.p;
+  state.attMonth = "";
+  $("#att-month").value = "";
   $("#att-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
   loadMyAttendance();
 });
 
+$("#att-month").addEventListener("change", (e) => {
+  const v = e.target.value; if (!v) return;
+  state.attPeriod = "specific";
+  state.attMonth = v;
+  $("#att-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
+  loadMyAttendance();
+});
+
 async function loadMyAttendance() {
-  const data = await api(`/api/attendance/my?period=${state.attPeriod}`);
+  let url = `/api/attendance/my?period=${state.attPeriod}`;
+  if (state.attPeriod === "specific" && state.attMonth) url += `&target_month=${state.attMonth}`;
+  const data = await api(url);
   const rows = data.records || [];
   const tbody = rows.length ? rows.map((r) => `
     <tr><td>${esc(r.work_date)}</td><td>${r.type === "clock_in" ? "上班" : "下班"}</td>
@@ -467,7 +480,17 @@ $("#admin-tabs").addEventListener("click", (e) => {
 $("#admin-att-period").addEventListener("click", (e) => {
   const btn = e.target.closest(".seg-btn"); if (!btn) return;
   state.adminAttPeriod = btn.dataset.p;
+  state.adminAttMonth = "";
+  $("#admin-att-month").value = "";
   $("#admin-att-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("active", b === btn));
+  loadAdminAttendance();
+});
+
+$("#admin-att-month").addEventListener("change", (e) => {
+  const v = e.target.value; if (!v) return;
+  state.adminAttPeriod = "specific";
+  state.adminAttMonth = v;
+  $("#admin-att-period").querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("active"));
   loadAdminAttendance();
 });
 
@@ -487,11 +510,15 @@ function statCard(label, value, sub) {
 
 async function loadAdminAttendance() {
   try {
-    const r = await api(`/api/attendance/report?period=${state.adminAttPeriod}`);
+    let url = `/api/attendance/report?period=${state.adminAttPeriod}`;
+    if (state.adminAttPeriod === "specific" && state.adminAttMonth) url += `&target_month=${state.adminAttMonth}`;
+    const r = await api(url);
     $("#admin-att-stats").innerHTML =
       statCard("考勤记录", r.stats.record_count, "人次") +
       statCard("迟到人次", `<span style="color:${r.stats.late_count ? "var(--danger)" : "var(--ok)"}">${r.stats.late_count}</span>`) +
       statCard("迟到最多", r.stats.late_top_str || "无");
+    const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : (r.range_start || "");
+    $("#admin-att-range").textContent = range ? `统计区间：${range}` : "";
     state.adminAttRows = r.rows || [];
     state.adminAttPage = 1;
     renderAdminAttTable();
