@@ -33,9 +33,10 @@ Thumbs.db
 # 本地数据库文件（不入库）
 *.db
 
-# ===== 桌宠素材（第三方 IP 素材，仅本地体验，不入公开仓库）=====
+# ===== 桌宠素材 =====
+# 注：咕咕嘎嘎角色帧(frames/)已按用户要求入库，确保同事 pull 后桌宠开箱即用。
+# 角色源(source/)含 116MB 原始打包帧(action.dyberpet)，为 dyberpet 完整角色包、桌宠实际只用 frames/ 的 21MB，仅本地保留不入库。
 FeibiPet_v0.0.1/
 v0.10.3_windows_full/
 frontend/assets/pet/*.gif
-frontend/assets/pet/frames/
 frontend/assets/pet/source/
