@@ -1711,11 +1711,18 @@ function finishDrag(e) {
   } else {
     _drag.on = false;
     savePetPos();
-    floatTogglePanel(); /* 未拖动 = 点击 → 弹出对话框 */
+    /* 未拖动：由 bubble 的 click 事件负责弹出对话框（更可靠，避免首次 pointerup 丢失导致点不开） */
   }
 }
 document.addEventListener("pointerup", finishDrag);
 document.addEventListener("pointercancel", finishDrag); /* 指针在窗口外释放时也兜底解除 */
+
+/* 单击打开/收起对话框：用标准 click 事件触发，最可靠且不受 pointer 捕获/动作态影响；
+   拖动(_drag.moved)时不触发，交给 finishDrag 做抛掷物理 */
+bubble.addEventListener("click", () => {
+  if (_drag.moved) return;   // 拖动过 → 不是点击，忽略
+  floatTogglePanel();        // 未拖动 = 点击 → 弹出/收起对话
+});
 bubble.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
 });
