@@ -667,24 +667,22 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 .float-bubble {
   position: fixed; right: 20px; bottom: 20px; z-index: 900;
   width: auto; height: auto; padding: 4px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-end; justify-content: center;
   cursor: grab; border: none; background: transparent;
   transition: filter .22s ease;
   user-select: none; -webkit-user-select: none;
   touch-action: none;
+  animation: petFloat 3.4s ease-in-out infinite;
 }
 .pet-img {
-  width: 84px; height: 84px; object-fit: contain;
+  height: 104px; width: auto; max-width: 200px; object-fit: contain;
   pointer-events: none; image-rendering: -webkit-optimize-contrast;
-  animation: petIdle 3s ease-in-out infinite;
-  filter: drop-shadow(0 8px 16px rgba(0,0,0,.14));
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.18));
 }
-.float-bubble:hover .pet-img { filter: drop-shadow(0 10px 22px rgba(99,85,247,.28)); }
+.float-bubble:hover .pet-img { filter: drop-shadow(0 12px 24px rgba(99,85,247,.34)); }
 .float-bubble:active { cursor: grabbing; }
 .float-bubble:focus-visible { outline: 2px solid #6355f7; outline-offset: 4px; border-radius: 12px; }
 .float-bubble.dragging { animation: none !important; cursor: grabbing; }
-.float-bubble.dragging .pet-img { animation: none !important; }
-.float-bubble.talking .pet-img { animation: petTalk .5s ease-in-out 3; }
 
 /* 在线状态小圆点（右上角） */
 .float-bubble-dot {
@@ -694,14 +692,9 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
   animation: dotBlink 2s ease-in-out infinite;
 }
 
-@keyframes petIdle {
+@keyframes petFloat {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-7px); }
-}
-@keyframes petTalk {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  25% { transform: rotate(-10deg) scale(1.06); }
-  75% { transform: rotate(10deg) scale(1.06); }
+  50% { transform: translateY(-6px); }
 }
 @keyframes dotBlink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 
@@ -938,7 +931,8 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 .quiz-bd .tbl th, .quiz-bd .tbl td { padding: 10px 14px; }
 
 @media (max-width: 520px) {
-  .float-bubble { right: 16px; bottom: 16px; width: 52px; height: 52px; }
+  .float-bubble { right: 14px; bottom: 14px; width: auto; height: auto; }
+  .float-bubble .pet-img { height: 80px; }
   .float-panel { right: 16px; bottom: 84px; }
   .chat-wrap { height: calc(100vh - 120px); }
 }

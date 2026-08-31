@@ -1200,6 +1200,7 @@ async function sendChat(message, fileObj = null) {
   const typing = appendChatTyping();
   const btn = $("#chat-send");
   btn.disabled = true;
+  setPetAction("eating");
   try {
     let r;
     if (fileObj) {
@@ -1216,9 +1217,11 @@ async function sendChat(message, fileObj = null) {
     }
     if (r.conversation_id) state.chatConvId = r.conversation_id;
     typing.innerHTML = renderText(r.reply);
-    bubble.classList.add("talking"); setTimeout(() => bubble.classList.remove("talking"), 1500);
+    setPetAction("talk");
+    setTimeout(() => { if (_petAction === "talk") setPetAction("idle"); }, 3200);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
+    setPetAction("idle");
   } finally {
     btn.disabled = false;
     clearChatFile(); // 发送后清掉已选文件
@@ -1295,7 +1298,9 @@ function floatTogglePanel(show) {
   const p = $("#float-panel");
   const open = (show !== undefined) ? show : p.classList.contains("hidden");
   p.classList.toggle("hidden", !open);
+  if (!open) setPetAction("idle");   /* 关闭对话 → 回待机 */
   if (open) {
+    setPetAction("talk");
     const user = state.user;
     if (user) {
       $("#float-sub").textContent = `${esc(user.name)} · ${esc(user.department)} · ${esc(user.position)}`;
@@ -1342,6 +1347,7 @@ async function askFloat(message, fileObj = null) {
   else appendFloatMsg("user", `📎 ${esc(fileObj.name)}${message ? " · " + message : ""}`);
   const typing = appendFloatTyping();
   $("#float-send").disabled = true;
+  setPetAction("eating");   /* 等待回复：吃饭动作 */
   try {
     let r;
     if (fileObj) {
@@ -1355,9 +1361,11 @@ async function askFloat(message, fileObj = null) {
     }
     if (r.conversation_id) state.floatConvId = r.conversation_id;
     typing.innerHTML = renderText(r.reply);
-    bubble.classList.add("talking"); setTimeout(() => bubble.classList.remove("talking"), 1500);
+    setPetAction("talk");
+    setTimeout(() => { if (_petAction === "talk") setPetAction("idle"); }, 3200);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
+    setPetAction("idle");
   } finally {
     $("#float-send").disabled = false;
     clearFloatFile(); // 发送后清掉已选文件
@@ -1394,6 +1402,33 @@ const bubble = $("#float-bubble");
 const fpanel = $("#float-panel");
 let _drag = { on: false, sx: 0, sy: 0, sl: 0, st: 0, moved: false };
 
+/* 桌宠动作状态机（素材：FeibiPet 的菲比 GIF — idle/talk/sleep/push/eating） */
+const petImg = $("#pet-img");
+const PET_GIFS = {
+  idle:   "assets/pet/idle.gif",
+  talk:   "assets/pet/talk.gif",
+  sleep:  "assets/pet/sleep.gif",
+  push:   "assets/pet/push.gif",
+  eating: "assets/pet/eating.gif",
+};
+let _petAction = "idle";
+let _petSleepTimer = null;
+function setPetAction(a) {
+  if (!PET_GIFS[a]) a = "idle";
+  if (a === _petAction) return;
+  _petAction = a;
+  petImg.src = PET_GIFS[a];
+  resetPetSleep();
+}
+function resetPetSleep() {
+  clearTimeout(_petSleepTimer);
+  if (_petAction !== "sleep") {
+    _petSleepTimer = setTimeout(() => setPetAction("sleep"), 22000);
+  }
+}
+function wakePet() { if (_petAction === "sleep") setPetAction("idle"); }
+resetPetSleep();
+
 (function initPetPos() {
   try {
     const s = JSON.parse(localStorage.getItem("pet_pos") || "null");
@@ -1420,6 +1455,7 @@ function savePetPos() {
 }
 
 bubble.addEventListener("pointerdown", (e) => {
+  wakePet();
   _drag.on = true; _drag.moved = false;
   _drag.sx = e.clientX; _drag.sy = e.clientY;
   const r = bubble.getBoundingClientRect();
@@ -1430,7 +1466,10 @@ bubble.addEventListener("pointerdown", (e) => {
 document.addEventListener("pointermove", (e) => {
   if (!_drag.on) return;
   const dx = e.clientX - _drag.sx, dy = e.clientY - _drag.sy;
-  if (Math.abs(dx) > PET_DRAG_THRESHOLD || Math.abs(dy) > PET_DRAG_THRESHOLD) _drag.moved = true;
+  if (Math.abs(dx) > PET_DRAG_THRESHOLD || Math.abs(dy) > PET_DRAG_THRESHOLD) {
+    if (!_drag.moved) setPetAction("push");   /* 被拖/被推的互动动作 */
+    _drag.moved = true;
+  }
   let nx = Math.max(0, Math.min(_drag.sl + dx, innerWidth - bubble.offsetWidth));
   let ny = Math.max(0, Math.min(_drag.st + dy, innerHeight - bubble.offsetHeight));
   bubble.style.right = "auto"; bubble.style.bottom = "auto";
@@ -1443,7 +1482,8 @@ document.addEventListener("pointerup", (e) => {
   bubble.classList.remove("dragging");
   try { bubble.releasePointerCapture(e.pointerId); } catch(_){}
   savePetPos();
-  if (!_drag.moved) floatTogglePanel(); /* 未拖动 = 点击 → 弹出对话框 */
+  if (_drag.moved) setPetAction("idle");
+  else floatTogglePanel(); /* 未拖动 = 点击 → 弹出对话框 */
 });
 bubble.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
