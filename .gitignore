@@ -33,8 +33,8 @@ Thumbs.db
 # 本地数据库文件（不入库）
 *.db
 
-# ===== 第三方桌宠应用（FeibiPet 整包，含 exe/dll/源码，不入库）=====
+# ===== 桌宠素材（第三方 IP 素材，仅本地体验，不入公开仓库）=====
 FeibiPet_v0.0.1/
-
-# ===== 桌宠素材（第三方：FeibiPet「菲比」GIF，角色 IP 归属不明，仅本地体验用，不入库）=====
+v0.10.3_windows_full/
 frontend/assets/pet/*.gif
+frontend/assets/pet/frames/
