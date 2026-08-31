@@ -1586,14 +1586,17 @@ function startWalk(dir) {
   _drag.on = true;              // 占用中，屏蔽随机动作
   let last = performance.now();
   const speed = 0.16;           // 水平速度 px/ms（约 160px/s）
+  const dur = 700 + Math.random() * 1800;  // 随机移动时长 0.7~2.5s → 走的距离随机（约 112~400px）
+  const endAt = performance.now() + dur;
   const step = (now) => {
+    if (now >= endAt) { _endWalk(); return; }   // 时长到 → 自动停下回待机
     let dt = now - last; last = now;
     if (dt > 40) dt = 40; if (dt < 0) dt = 0;
     const W = bubble.offsetWidth;
     let x = parseFloat(bubble.style.left) || 0;
     const vw = innerWidth;
     x += dir * speed * dt;
-    if (x <= 0) { x = 0; _endWalk(); return; }
+    if (x <= 0) { x = 0; _endWalk(); return; }   // 撞到左边缘也提前停
     if (x + W >= vw) { x = vw - W; _endWalk(); return; }
     bubble.style.left = x + "px";
     if (!fpanel.classList.contains("hidden")) syncPanelToPet();
