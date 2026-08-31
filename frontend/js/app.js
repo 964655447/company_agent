@@ -1402,7 +1402,7 @@ floatFileInput.addEventListener("change", () => {
 $("#float-file-chip-del").addEventListener("click", () => clearFloatFile());
 
 /* ====== 桌宠拖动（替代原悬浮球点击） ====== */
-const PET_DRAG_THRESHOLD = 5;
+const PET_DRAG_THRESHOLD = 8;
 /* 桌宠物理引擎参数（重力下落 + 抛掷弹性反弹，复刻 exe 手感） */
 const PET_GRAVITY = 0.0026;        // 重力加速度 px/ms^2
 const PET_RESTITUTION = 0.56;      // 垂直（触底）反弹系数
@@ -1700,7 +1700,13 @@ function finishDrag(e) {
   _drag.grabbing = false;        // 松手即解除"按住"状态，mouse 后续移动不再触发展开跟随
   bubble.classList.remove("dragging");
   try { bubble.releasePointerCapture(e.pointerId); } catch(_){}
-  if (_drag.moved) {
+  /* 区分"点击"与"真正拖动/抛掷"：人手点击通常有数像素微抖，不能只靠 moved 标志。
+     只有 总位移 > 10px 或 松手仍有明显速度 才视为拖动/抛掷 → 走物理；
+     其余（含普通点击的微小抖动）一律视为点击 → 直接弹出/收起对话框。 */
+  const dx = e.clientX - _drag.sx, dy = e.clientY - _drag.sy;
+  const dist = Math.hypot(dx, dy);
+  const spd = Math.hypot(_drag.vx, _drag.vy);
+  if (_drag.moved && (dist > 10 || spd > 0.5)) {
     let vx = _drag.vx, vy = _drag.vy;
     /* 松手前已停顿（>90ms 无移动）视为轻放，只受重力下落不抛掷 */
     if (performance.now() - (_drag.lastT || 0) > 90) { vx = 0; vy = 0; }
@@ -1710,9 +1716,9 @@ function finishDrag(e) {
     startPhysics(vx, vy);
   } else {
     _drag.on = false;
+    /* 点击：还原到按下位置（避免微抖导致宠物漂移），弹出/收起对话框 */
+    bubble.style.left = _drag.sl + "px"; bubble.style.top = _drag.st + "px";
     savePetPos();
-    /* 纯点击：直接在 pointerup 处理（pointerup 释放时必定触发，比 click 事件可靠，避免首次点不开），
-       并标记 justClicked，抑制后面可能追发的 click 事件重复切换面板 */
     _drag.justClicked = true;
     floatTogglePanel();
   }
@@ -1720,8 +1726,8 @@ function finishDrag(e) {
 document.addEventListener("pointerup", finishDrag);
 document.addEventListener("pointercancel", finishDrag); /* 指针在窗口外释放时也兜底解除 */
 
-/* 单击打开/收起对话框：用标准 click 事件触发，最可靠且不受 pointer 捕获/动作态影响；
-   拖动(_drag.moved)时不触发，交给 finishDrag 做抛掷物理 */
+/* 单击兜底：开面板的主体逻辑在 pointerup(finishDrag) 里。此处仅兜底极少数 pointerup 未触发的情况；
+   若 finishDrag 已处理本次点击（justClicked=true）则跳过，避免面板被"开→又关"重复切换 */
 bubble.addEventListener("click", () => {
   if (_drag.justClicked) { _drag.justClicked = false; return; }  // pointerup 已处理本次点击，避免重复切换
   if (_drag.moved) return;   // 拖动过 → 不是点击，忽略
