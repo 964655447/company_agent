@@ -6,7 +6,8 @@ const TOKEN_KEY = "cm_token", USER_KEY = "cm_user";
 
 const $ = (sel) => document.querySelector(sel);
 const state = { user: null, rosterEditing: null, attPeriod: "week", adminAttPeriod: "week",
-                floatConvId: null, chatConvId: null };
+                floatConvId: null, chatConvId: null,
+                adminAttRows: [], adminAttPage: 1, adminAttPageSize: 20 };
 
 /* 转义 HTML 后保留换行，便于展示多行回答 */
 function renderText(s) {
@@ -491,14 +492,77 @@ async function loadAdminAttendance() {
       statCard("考勤记录", r.stats.record_count, "人次") +
       statCard("迟到人次", `<span style="color:${r.stats.late_count ? "var(--danger)" : "var(--ok)"}">${r.stats.late_count}</span>`) +
       statCard("迟到最多", r.stats.late_top_str || "无");
-    const tbody = (r.rows || []).length ? r.rows.map((row) => `
+    state.adminAttRows = r.rows || [];
+    state.adminAttPage = 1;
+    renderAdminAttTable();
+  } catch (err) { console.error(err); }
+}
+
+/* 分页窗口：总页数 ≤7 全显示；否则显示 首/尾 + 当前页附近 ±2 + 省略号 */
+function _pageWindow(cur, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const arr = [1];
+  const s = Math.max(2, cur - 2), e = Math.min(total - 1, cur + 2);
+  if (s > 2) arr.push("…");
+  for (let i = s; i <= e; i++) arr.push(i);
+  if (e < total - 1) arr.push("…");
+  arr.push(total);
+  return arr;
+}
+
+function renderAdminAttTable() {
+  const rows = state.adminAttRows;
+  const size = state.adminAttPageSize;
+  const totalPages = Math.max(1, Math.ceil(rows.length / size));
+  if (state.adminAttPage > totalPages) state.adminAttPage = totalPages;
+  const start = (state.adminAttPage - 1) * size;
+  const pageRows = rows.slice(start, start + size);
+
+  const tbody = pageRows.length ? pageRows.map((row) => `
       <tr><td>${esc(row.employee_name)}</td><td>${esc(row.work_date)}</td>
       <td>${row.type === "clock_in" ? "上班" : "下班"}</td><td>${fmtTime(row.checkin_time)}</td>
       <td>${row.is_late ? '<span class="tag tag-danger">迟到</span>' : '<span class="tag tag-ok">正常</span>'}</td></tr>`).join("")
-      : `<tr class="empty"><td colspan="5">${emptyHTML("暂无考勤数据")}</td></tr>`;
-    $("#admin-att-table").innerHTML = `<thead><tr><th>员工</th><th>日期</th><th>类型</th><th>时间</th><th>状态</th></tr></thead><tbody>${tbody}</tbody>`;
-  } catch (err) { console.error(err); }
+    : `<tr class="empty"><td colspan="5">${emptyHTML("暂无考勤数据")}</td></tr>`;
+  $("#admin-att-table").innerHTML = `<thead><tr><th>员工</th><th>日期</th><th>类型</th><th>时间</th><th>状态</th></tr></thead><tbody>${tbody}</tbody>`;
+
+  // 分页控件
+  const total = rows.length;
+  const pager = $("#admin-att-pager");
+  if (total === 0) { pager.innerHTML = ""; return; }
+  const cur = state.adminAttPage;
+  const from = start + 1, to = Math.min(start + size, total);
+  let html = `<button class="pg-btn" data-pg="prev" ${cur === 1 ? "disabled" : ""}>‹ 上一页</button>`;
+  for (const p of _pageWindow(cur, totalPages)) {
+    if (p === "…") html += `<span class="pg-ellipsis">…</span>`;
+    else html += `<button class="pg-btn ${p === cur ? "active" : ""}" data-pg="${p}">${p}</button>`;
+  }
+  html += `<button class="pg-btn" data-pg="next" ${cur === totalPages ? "disabled" : ""}>下一页 ›</button>`;
+  html += `<span class="pg-info">第 ${from}-${to} 条 / 共 ${total} 条</span>`;
+  html += `<select class="pg-size" id="admin-att-pagesize">
+      <option value="10">10/页</option><option value="20" ${size === 20 ? "selected" : ""}>20/页</option>
+      <option value="50" ${size === 50 ? "selected" : ""}>50/页</option>
+      <option value="100" ${size === 100 ? "selected" : ""}>100/页</option></select>`;
+  pager.innerHTML = html;
 }
+
+/* 分页交互（事件委托，控件是动态生成的） */
+$("#admin-att-pager").addEventListener("click", (e) => {
+  const btn = e.target.closest(".pg-btn");
+  if (!btn || btn.disabled) return;
+  const pg = btn.dataset.pg;
+  const totalPages = Math.max(1, Math.ceil(state.adminAttRows.length / state.adminAttPageSize));
+  if (pg === "prev") state.adminAttPage = Math.max(1, state.adminAttPage - 1);
+  else if (pg === "next") state.adminAttPage = Math.min(totalPages, state.adminAttPage + 1);
+  else state.adminAttPage = parseInt(pg, 10);
+  renderAdminAttTable();
+});
+$("#admin-att-pager").addEventListener("change", (e) => {
+  if (e.target.id === "admin-att-pagesize") {
+    state.adminAttPageSize = parseInt(e.target.value, 10);
+    state.adminAttPage = 1;
+    renderAdminAttTable();
+  }
+});
 
 let lastAdminReimbRows = [];
 async function loadAdminReimb() {
