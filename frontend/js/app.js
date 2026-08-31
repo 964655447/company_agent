@@ -1486,7 +1486,7 @@ function setPetAction(a, once) {
 function resetPetSleep() {
   clearTimeout(_sleepT);
   if (_act !== "sleep") {
-    _sleepT = setTimeout(() => setPetAction("sleep"), 22000);
+    _sleepT = setTimeout(() => setPetAction("sleep", true), 22000); /* once=true：睡一觉自动醒，不永久睡、不循环 */
   }
 }
 function wakePet() { if (_act === "sleep") setPetAction("idle"); }
