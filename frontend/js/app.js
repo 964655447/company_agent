@@ -1216,6 +1216,7 @@ async function sendChat(message, fileObj = null) {
     }
     if (r.conversation_id) state.chatConvId = r.conversation_id;
     typing.innerHTML = renderText(r.reply);
+    bubble.classList.add("talking"); setTimeout(() => bubble.classList.remove("talking"), 1500);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
   } finally {
@@ -1309,6 +1310,7 @@ function floatTogglePanel(show) {
         appendFloatMsg("bot", "你好！我是公司 AI 助手，点下方功能或直接输入。");
       }
     }
+    syncPanelToPet();
     $("#float-input").focus();
   }
 }
@@ -1353,6 +1355,7 @@ async function askFloat(message, fileObj = null) {
     }
     if (r.conversation_id) state.floatConvId = r.conversation_id;
     typing.innerHTML = renderText(r.reply);
+    bubble.classList.add("talking"); setTimeout(() => bubble.classList.remove("talking"), 1500);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
   } finally {
@@ -1385,9 +1388,64 @@ floatFileInput.addEventListener("change", () => {
 });
 $("#float-file-chip-del").addEventListener("click", () => clearFloatFile());
 
-/* 悬浮球事件绑定 */
-$("#float-bubble").addEventListener("click", () => floatTogglePanel());
-$("#float-bubble").addEventListener("keydown", (e) => {
+/* ====== 桌宠拖动（替代原悬浮球点击） ====== */
+const PET_DRAG_THRESHOLD = 5;
+const bubble = $("#float-bubble");
+const fpanel = $("#float-panel");
+let _drag = { on: false, sx: 0, sy: 0, sl: 0, st: 0, moved: false };
+
+(function initPetPos() {
+  try {
+    const s = JSON.parse(localStorage.getItem("pet_pos") || "null");
+    if (s && typeof s.x === "number") {
+      bubble.style.right = "auto"; bubble.style.bottom = "auto";
+      bubble.style.left = s.x + "px"; bubble.style.top = s.y + "px";
+    }
+  } catch(_) {}
+})();
+
+function syncPanelToPet() {
+  const br = bubble.getBoundingClientRect();
+  const pw = fpanel.offsetWidth || 330;
+  const ph = fpanel.offsetHeight || 420;
+  let pl = Math.min(br.left, innerWidth - pw - 12); if (pl < 8) pl = 8;
+  let pt = br.top - ph - 6;
+  if (pt < 8 || pt + ph > innerHeight - 12) pt = br.bottom + 6;
+  fpanel.style.right = "auto"; fpanel.style.bottom = "auto";
+  fpanel.style.left = pl + "px"; fpanel.style.top = pt + "px";
+}
+
+function savePetPos() {
+  try { localStorage.setItem("pet_pos", JSON.stringify({x:parseFloat(bubble.style.left),y:parseFloat(bubble.style.top)})); } catch(_){}
+}
+
+bubble.addEventListener("pointerdown", (e) => {
+  _drag.on = true; _drag.moved = false;
+  _drag.sx = e.clientX; _drag.sy = e.clientY;
+  const r = bubble.getBoundingClientRect();
+  _drag.sl = r.left; _drag.st = r.top;
+  bubble.classList.add("dragging");
+  bubble.setPointerCapture(e.pointerId);
+});
+document.addEventListener("pointermove", (e) => {
+  if (!_drag.on) return;
+  const dx = e.clientX - _drag.sx, dy = e.clientY - _drag.sy;
+  if (Math.abs(dx) > PET_DRAG_THRESHOLD || Math.abs(dy) > PET_DRAG_THRESHOLD) _drag.moved = true;
+  let nx = Math.max(0, Math.min(_drag.sl + dx, innerWidth - bubble.offsetWidth));
+  let ny = Math.max(0, Math.min(_drag.st + dy, innerHeight - bubble.offsetHeight));
+  bubble.style.right = "auto"; bubble.style.bottom = "auto";
+  bubble.style.left = nx + "px"; bubble.style.top = ny + "px";
+  if (!fpanel.classList.contains("hidden")) syncPanelToPet();
+});
+document.addEventListener("pointerup", (e) => {
+  if (!_drag.on) return;
+  _drag.on = false;
+  bubble.classList.remove("dragging");
+  try { bubble.releasePointerCapture(e.pointerId); } catch(_){}
+  savePetPos();
+  if (!_drag.moved) floatTogglePanel(); /* 未拖动 = 点击 → 弹出对话框 */
+});
+bubble.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
 });
 $("#float-close").addEventListener("click", () => floatTogglePanel(false));
