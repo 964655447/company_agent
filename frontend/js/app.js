@@ -14,7 +14,7 @@ const state = { user: null, rosterEditing: null, attPeriod: "week", adminAttPeri
                 adminSalaryPeriod: "month", adminSalaryMonth: "",
                 adminAssessPeriod: "month", adminAssessMonth: "",
                 floatConvId: null, chatConvId: null,
-                adminAttRows: [], adminAttPage: 1, adminAttPageSize: 20 };
+                adminAttRows: [], adminAttPage: 1, adminAttPageSize: 10 };
 
 /* 转义 HTML 后保留换行，便于展示多行回答 */
 function renderText(s) {
@@ -678,7 +678,7 @@ function renderAdminAttTable() {
   html += `<button class="pg-btn" data-pg="next" ${cur === totalPages ? "disabled" : ""}>下一页 ›</button>`;
   html += `<span class="pg-info">第 ${from}-${to} 条 / 共 ${total} 条</span>`;
   html += `<select class="pg-size" id="admin-att-pagesize">
-      <option value="10">10/页</option><option value="20" ${size === 20 ? "selected" : ""}>20/页</option>
+      <option value="10" ${size === 10 ? "selected" : ""}>10/页</option><option value="20" ${size === 20 ? "selected" : ""}>20/页</option>
       <option value="50" ${size === 50 ? "selected" : ""}>50/页</option>
       <option value="100" ${size === 100 ? "selected" : ""}>100/页</option></select>`;
   pager.innerHTML = html;
