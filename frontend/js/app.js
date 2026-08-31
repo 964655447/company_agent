@@ -1398,9 +1398,15 @@ $("#float-file-chip-del").addEventListener("click", () => clearFloatFile());
 
 /* ====== 桌宠拖动（替代原悬浮球点击） ====== */
 const PET_DRAG_THRESHOLD = 5;
+/* 桌宠物理引擎参数（重力下落 + 抛掷弹性反弹，复刻 exe 手感） */
+const PET_GRAVITY = 0.0026;        // 重力加速度 px/ms^2
+const PET_RESTITUTION = 0.56;      // 垂直（触底）反弹系数
+const PET_RESTITUTION_X = 0.62;    // 水平（触边）反弹系数
+const PET_FRICTION = 0.84;         // 落地水平摩擦衰减
+const PET_MAX_THROW = 2.6;         // 抛掷初速度限幅 px/ms
 const bubble = $("#float-bubble");
 const fpanel = $("#float-panel");
-let _drag = { on: false, sx: 0, sy: 0, sl: 0, st: 0, moved: false };
+let _drag = { on: false, sx: 0, sy: 0, sl: 0, st: 0, moved: false, vx: 0, vy: 0, lastX: 0, lastY: 0, lastT: 0 };
 
 /* 桌宠动作状态机（素材：呆啵宠物 · 咕咕嘎嘎 真实动作帧） */
 const petImg = $("#pet-img");
@@ -1519,10 +1525,47 @@ function savePetPos() {
   try { localStorage.setItem("pet_pos", JSON.stringify({x:parseFloat(bubble.style.left),y:parseFloat(bubble.style.top)})); } catch(_){}
 }
 
+/* ===== 桌宠物理引擎：松手后按初速度做抛物运动，触底/触边弹性反弹 ===== */
+function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
+let _physRAF = null;
+function startPhysics(vx, vy) {
+  _drag.on = true;                 // 物理活动中：阻止随机动作 & 标记占用
+  let last = performance.now();
+  const step = (now) => {
+    let dt = now - last; last = now;
+    if (dt > 40) dt = 40;          // 限幅，避免后台标签页回切时大跳
+    const W = bubble.offsetWidth, H = bubble.offsetHeight;
+    let x = parseFloat(bubble.style.left) || 0;
+    let y = parseFloat(bubble.style.top) || 0;
+    const vw = innerWidth, vh = innerHeight;
+    vy += PET_GRAVITY * dt;
+    x += vx * dt; y += vy * dt;
+    if (y + H >= vh) { y = vh - H; if (vy > 0) vy = -vy * PET_RESTITUTION; vx *= PET_FRICTION; if (Math.abs(vy) < 0.04) vy = 0; }
+    if (y < 0) { y = 0; if (vy < 0) vy = -vy * PET_RESTITUTION; }
+    if (x < 0) { x = 0; if (vx < 0) vx = -vx * PET_RESTITUTION_X; }
+    if (x + W > vw) { x = vw - W; if (vx > 0) vx = -vx * PET_RESTITUTION_X; }
+    bubble.style.left = x + "px"; bubble.style.top = y + "px";
+    if (!fpanel.classList.contains("hidden")) syncPanelToPet();
+    /* 静止判定：贴地且速度几乎归零 */
+    if (y + H >= vh - 1 && Math.abs(vy) < 0.03 && Math.abs(vx) < 0.03) { stopPhysics(); return; }
+    _physRAF = requestAnimationFrame(step);
+  };
+  _physRAF = requestAnimationFrame(step);
+}
+function stopPhysics() {
+  if (_physRAF) { cancelAnimationFrame(_physRAF); _physRAF = null; }
+  _drag.on = false;
+  savePetPos();
+  setPetAction("idle");
+}
+
 bubble.addEventListener("pointerdown", (e) => {
+  if (_physRAF) stopPhysics();     // 物理下落中再次按下 → 先定格再拖
   wakePet();
   _drag.on = true; _drag.moved = false;
   _drag.sx = e.clientX; _drag.sy = e.clientY;
+  _drag.vx = 0; _drag.vy = 0;
+  _drag.lastX = e.clientX; _drag.lastY = e.clientY; _drag.lastT = performance.now();
   const r = bubble.getBoundingClientRect();
   _drag.sl = r.left; _drag.st = r.top;
   bubble.classList.add("dragging");
@@ -1530,6 +1573,16 @@ bubble.addEventListener("pointerdown", (e) => {
 });
 document.addEventListener("pointermove", (e) => {
   if (!_drag.on) return;
+  /* 记录瞬时速度（用于松手抛掷）：用上一帧位置差 / 时间差 */
+  const nowT = performance.now();
+  if (_drag.lastT) {
+    const ddt = nowT - _drag.lastT;
+    if (ddt > 0) {
+      _drag.vx = (e.clientX - _drag.lastX) / ddt;
+      _drag.vy = (e.clientY - _drag.lastY) / ddt;
+    }
+  }
+  _drag.lastX = e.clientX; _drag.lastY = e.clientY; _drag.lastT = nowT;
   const dx = e.clientX - _drag.sx, dy = e.clientY - _drag.sy;
   if (Math.abs(dx) > PET_DRAG_THRESHOLD || Math.abs(dy) > PET_DRAG_THRESHOLD) {
     if (!_drag.moved) setPetAction("push");   /* 被拖/被推的互动动作 */
@@ -1543,12 +1596,21 @@ document.addEventListener("pointermove", (e) => {
 });
 document.addEventListener("pointerup", (e) => {
   if (!_drag.on) return;
-  _drag.on = false;
   bubble.classList.remove("dragging");
   try { bubble.releasePointerCapture(e.pointerId); } catch(_){}
-  savePetPos();
-  if (_drag.moved) setPetAction("idle");
-  else floatTogglePanel(); /* 未拖动 = 点击 → 弹出对话框 */
+  if (_drag.moved) {
+    let vx = _drag.vx, vy = _drag.vy;
+    /* 松手前已停顿（>90ms 无移动）视为轻放，只受重力下落不抛掷 */
+    if (performance.now() - (_drag.lastT || 0) > 90) { vx = 0; vy = 0; }
+    vx = Math.max(-PET_MAX_THROW, Math.min(PET_MAX_THROW, vx || 0));
+    vy = Math.max(-PET_MAX_THROW, Math.min(PET_MAX_THROW, vy || 0));
+    setPetAction("idle");
+    startPhysics(vx, vy);
+  } else {
+    _drag.on = false;
+    savePetPos();
+    floatTogglePanel(); /* 未拖动 = 点击 → 弹出对话框 */
+  }
 });
 bubble.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
