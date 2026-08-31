@@ -689,6 +689,12 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 .float-bubble.pet-sleep .pet-img { opacity: .55; filter: drop-shadow(0 4px 10px rgba(0,0,0,.1)) brightness(.75); }
 .float-bubble.pet-push .pet-img { animation: petWobble .3s ease-in-out; transform: rotate(-8deg) scale(1.08); }
 .float-bubble.pet-eating .pet-img { animation: petChomp .25s ease-in-out 4; }
+.float-bubble.pet-dance .pet-img { animation: petDanceWiggle .42s ease-in-out infinite; transform-origin: 50% 90%; }
+
+@keyframes petDanceWiggle {
+  0%, 100% { transform: rotate(-5deg) scale(1.08); }
+  50% { transform: rotate(5deg) scale(1.08); }
+}
 
 @keyframes petBounce {
   0%,100% { transform: translateY(0) scale(1); }

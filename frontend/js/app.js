@@ -1405,37 +1405,67 @@ let _drag = { on: false, sx: 0, sy: 0, sl: 0, st: 0, moved: false };
 /* 桌宠动作状态机（素材：呆啵宠物 · 咕咕嘎嘎 真实动作帧） */
 const petImg = $("#pet-img");
 const PET_ACTS = {
-  idle:  { prefix: "idle", count: 66, fps: 120 },
-  push:  { prefix: "push", count: 51, fps: 60 },
-  sleep: { prefix: "sleep", count: 82, fps: 100 },
+  idle:      { prefix: "idle",      count: 66,  fps: 120 },
+  push:      { prefix: "push",      count: 51,  fps: 60  },
+  sleep:     { prefix: "sleep",     count: 82,  fps: 100 },
+  dance:     { prefix: "dance",     count: 241, fps: 50  },
+  walkleft:  { prefix: "walkleft",  count: 30,  fps: 90  },
+  walkright: { prefix: "walkright", count: 31,  fps: 90  },
+  patpat:    { prefix: "patpat",    count: 82,  fps: 80  },
+  playcar:   { prefix: "playcar",   count: 129, fps: 80  },
+  fall:      { prefix: "fall",      count: 51,  fps: 70  },
 };
+const FRAME_ACTS = ["idle","push","sleep","dance","walkleft","walkright","patpat","playcar","fall"];
+const PET_TRICKS = ["dance","patpat","playcar","fall","walkleft","walkright"];
 let _act = "idle";
 let _fi = 0;
 let _ft = null;
+let _trickForceT = null;
 let _sleepT = null;
+let _trickT = null;
 
-function startPetFrames(action) {
+function startPetFrames(action, once) {
   const cfg = PET_ACTS[action] || PET_ACTS.idle;
   clearInterval(_ft); _ft = null; _act = action; _fi = 0;
+  clearTimeout(_trickForceT); _trickForceT = null;
   petImg.src = "assets/pet/frames/" + cfg.prefix + "_000.png";
-  _ft = setInterval(() => {
-    _fi = (_fi + 1) % cfg.count;
-    const n = String(_fi).padStart(3,"0");
-    petImg.src = "assets/pet/frames/" + cfg.prefix + "_" + n + ".png";
-  }, cfg.fps);
+  if (once) {
+    _ft = setInterval(() => {
+      _fi++;
+      if (_fi >= cfg.count) {
+        clearInterval(_ft); _ft = null;
+        if (_act === action) setPetAction("idle");
+        return;
+      }
+      const n = String(_fi).padStart(3, "0");
+      petImg.src = "assets/pet/frames/" + cfg.prefix + "_" + n + ".png";
+    }, cfg.fps);
+    /* 长动画（如跳舞 241 帧）最多播 5.5s 自动收尾，避免停在中间帧 */
+    if (cfg.count * cfg.fps > 5500) {
+      _trickForceT = setTimeout(() => { if (_act === action) setPetAction("idle"); }, 5500);
+    }
+  } else {
+    _ft = setInterval(() => {
+      _fi = (_fi + 1) % cfg.count;
+      const n = String(_fi).padStart(3, "0");
+      petImg.src = "assets/pet/frames/" + cfg.prefix + "_" + n + ".png";
+    }, cfg.fps);
+  }
 }
 
-/* CSS class 叠加：talk/eating 复用 idle 帧 + 视觉效果；push/sleep 用真实帧 */
-function setPetAction(a) {
-  const valid = ["idle","talk","sleep","push","eating"];
+/* 动作切换：talk/eating 复用 idle 帧 + CSS 视觉；其余用各自真实帧集（once=播放一遍后回 idle） */
+function setPetAction(a, once) {
+  const valid = ["idle","talk","sleep","push","eating","dance","walkleft","walkright","patpat","playcar","fall"];
   if (!valid.includes(a)) a = "idle";
-  /* push/sleep 切换真实帧集，其余复用 idle 帧 + CSS */
-  if (a === "push") startPetFrames("push");
-  else if (a === "sleep") startPetFrames("sleep");
-  else if (_act !== "idle") startPetFrames("idle");
+  if (FRAME_ACTS.includes(a)) {
+    startPetFrames(a, !!once);
+  } else if (_act !== "idle") {
+    startPetFrames("idle", false);
+  }
   bubble.className = "float-bubble" + (bubble.classList.contains("hidden") ? " hidden" : "") +
     (a !== "idle" ? " pet-" + a : "");
   resetPetSleep();
+  if (a === "idle") scheduleRandomTrick(); /* 回到待机后继续排程随机动作 */
 }
 function resetPetSleep() {
   clearTimeout(_sleepT);
@@ -1445,9 +1475,23 @@ function resetPetSleep() {
 }
 function wakePet() { if (_act === "sleep") setPetAction("idle"); }
 
-/* 启动帧循环 */
-startPetFrames("idle");
+/* 随机趣味动作：空闲时偶尔自发跳舞/拍拍/玩车/跌倒/踱步 */
+function scheduleRandomTrick() {
+  clearTimeout(_trickT);
+  _trickT = setTimeout(() => {
+    /* 仅当真正空闲：待机态、未拖拽、对话框未打开 */
+    if (_act === "idle" && !_drag.on && fpanel.classList.contains("hidden")) {
+      const t = PET_TRICKS[Math.floor(Math.random() * PET_TRICKS.length)];
+      setPetAction(t, true);
+    }
+    scheduleRandomTrick();
+  }, 7000 + Math.random() * 9000);
+}
+
+/* 启动：待机循环 + 随机动作调度 */
+startPetFrames("idle", false);
 resetPetSleep();
+scheduleRandomTrick();
 
 (function initPetPos() {
   try {
