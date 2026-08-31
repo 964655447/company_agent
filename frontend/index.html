@@ -161,15 +161,15 @@
       <div class="card">
         <div class="card-head"><h3>查询岗位</h3></div>
         <form id="assess-form" class="assess-form">
-          <input list="position-list" id="assess-position" placeholder="输入想了解的岗位，如：调度经理">
-          <datalist id="position-list">
+          <select id="assess-position">
+            <option value="">— 选择或输入岗位 —</option>
             <option>总经理</option><option>商务总监</option><option>营销经理</option>
             <option>营销专员</option><option>运营总监</option><option>调度经理</option>
             <option>调度专员</option><option>运营经理</option><option>运营专员</option>
             <option>客服经理</option><option>客服专员</option><option>总车队长</option>
             <option>车队长</option><option>车队文员</option><option>财务总监</option>
             <option>会计</option><option>出纳</option><option>审核</option>
-          </datalist>
+          </select>
           <button type="submit" class="btn-primary">查询岗位</button>
         </form>
         <div class="form-tip">岗位介绍与能力要求来自系统知识库，助力转岗与升职规划。</div>
