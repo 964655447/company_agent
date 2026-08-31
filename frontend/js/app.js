@@ -1406,7 +1406,7 @@ const PET_FRICTION = 0.84;         // 落地水平摩擦衰减
 const PET_MAX_THROW = 2.6;         // 抛掷初速度限幅 px/ms
 const bubble = $("#float-bubble");
 const fpanel = $("#float-panel");
-let _drag = { on: false, sx: 0, sy: 0, sl: 0, st: 0, moved: false, vx: 0, vy: 0, lastX: 0, lastY: 0, lastT: 0 };
+let _drag = { on: false, grabbing: false, sx: 0, sy: 0, sl: 0, st: 0, moved: false, vx: 0, vy: 0, lastX: 0, lastY: 0, lastT: 0, recent: [] };
 
 /* 桌宠动作状态机（素材：呆啵宠物 · 咕咕嘎嘎 真实动作帧） */
 const petImg = $("#pet-img");
@@ -1532,8 +1532,9 @@ function startPhysics(vx, vy) {
   _drag.on = true;                 // 物理活动中：阻止随机动作 & 标记占用
   let last = performance.now();
   const step = (now) => {
-    let dt = now - last; last = now;
-    if (dt > 40) dt = 40;          // 限幅，避免后台标签页回切时大跳
+  let dt = now - last; last = now;
+  if (dt > 40) dt = 40;          // 限幅，避免后台标签页回切时大跳
+  if (dt < 0) dt = 0;            // 首帧 rAF 时间戳可能早于起始时刻，钳掉防止反向位移
     const W = bubble.offsetWidth, H = bubble.offsetHeight;
     let x = parseFloat(bubble.style.left) || 0;
     let y = parseFloat(bubble.style.top) || 0;
@@ -1562,7 +1563,7 @@ function stopPhysics() {
 bubble.addEventListener("pointerdown", (e) => {
   if (_physRAF) stopPhysics();     // 物理下落中再次按下 → 先定格再拖
   wakePet();
-  _drag.on = true; _drag.moved = false;
+  _drag.on = true; _drag.grabbing = true; _drag.moved = false;
   _drag.sx = e.clientX; _drag.sy = e.clientY;
   _drag.vx = 0; _drag.vy = 0;
   _drag.lastX = e.clientX; _drag.lastY = e.clientY; _drag.lastT = performance.now();
@@ -1572,7 +1573,7 @@ bubble.addEventListener("pointerdown", (e) => {
   bubble.setPointerCapture(e.pointerId);
 });
 document.addEventListener("pointermove", (e) => {
-  if (!_drag.on) return;
+  if (!_drag.grabbing) return;   // 仅按住拖拽时跟随；物理飞行/hover 时不跟随，避免松手后瞬移回鼠标
   /* 记录瞬时速度（用于松手抛掷）：用上一帧位置差 / 时间差 */
   const nowT = performance.now();
   if (_drag.lastT) {
@@ -1594,16 +1595,17 @@ document.addEventListener("pointermove", (e) => {
   bubble.style.left = nx + "px"; bubble.style.top = ny + "px";
   if (!fpanel.classList.contains("hidden")) syncPanelToPet();
 });
-document.addEventListener("pointerup", (e) => {
+function finishDrag(e) {
   if (!_drag.on) return;
+  _drag.grabbing = false;        // 松手即解除"按住"状态，mouse 后续移动不再触发展开跟随
   bubble.classList.remove("dragging");
   try { bubble.releasePointerCapture(e.pointerId); } catch(_){}
   if (_drag.moved) {
     let vx = _drag.vx, vy = _drag.vy;
     /* 松手前已停顿（>90ms 无移动）视为轻放，只受重力下落不抛掷 */
     if (performance.now() - (_drag.lastT || 0) > 90) { vx = 0; vy = 0; }
-    vx = Math.max(-PET_MAX_THROW, Math.min(PET_MAX_THROW, vx || 0));
-    vy = Math.max(-PET_MAX_THROW, Math.min(PET_MAX_THROW, vy || 0));
+    vx = clamp(vx, -PET_MAX_THROW, PET_MAX_THROW);
+    vy = clamp(vy, -PET_MAX_THROW, PET_MAX_THROW);
     setPetAction("idle");
     startPhysics(vx, vy);
   } else {
@@ -1611,7 +1613,9 @@ document.addEventListener("pointerup", (e) => {
     savePetPos();
     floatTogglePanel(); /* 未拖动 = 点击 → 弹出对话框 */
   }
-});
+}
+document.addEventListener("pointerup", finishDrag);
+document.addEventListener("pointercancel", finishDrag); /* 指针在窗口外释放时也兜底解除 */
 bubble.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
 });
