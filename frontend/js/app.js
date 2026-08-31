@@ -1300,6 +1300,11 @@ function floatTogglePanel(show) {
   p.classList.toggle("hidden", !open);
   if (!open) setPetAction("idle");   /* 关闭对话 → 回待机 */
   if (open) {
+    /* 恢复用户调整过的尺寸 */
+    try {
+      const sz = JSON.parse(localStorage.getItem("panel_size") || "");
+      if (sz && sz.w && sz.h) { fpanel.style.width = sz.w + "px"; fpanel.style.height = sz.h + "px"; }
+    } catch(_){}
     setPetAction("talk");
     const user = state.user;
     if (user) {
@@ -1518,14 +1523,66 @@ scheduleRandomTrick();
 
 function syncPanelToPet() {
   const br = bubble.getBoundingClientRect();
-  const pw = fpanel.offsetWidth || 330;
-  const ph = fpanel.offsetHeight || 420;
-  let pl = Math.min(br.left, innerWidth - pw - 12); if (pl < 8) pl = 8;
-  let pt = br.top - ph - 6;
-  if (pt < 8 || pt + ph > innerHeight - 12) pt = br.bottom + 6;
+  const pw = fpanel.offsetWidth || 480;
+  const ph = fpanel.offsetHeight || 480;
+  /* 居中于宠物正上方 */
+  let pl = br.left + (br.width - pw) / 2;
+  let pt = br.top - ph - 8;
+  /* 边界保护 */
+  if (pl < 10) pl = 10;
+  if (pl + pw > innerWidth - 10) pl = innerWidth - pw - 10;
+  if (pt < 10) pt = br.bottom + 8;           /* 上方放不下 → 放下方 */
+  if (pt + ph > innerHeight - 10) pt = innerHeight - ph - 10;
   fpanel.style.right = "auto"; fpanel.style.bottom = "auto";
   fpanel.style.left = pl + "px"; fpanel.style.top = pt + "px";
 }
+
+/* ===== 面板拖拽调整大小（8 方向） ===== */
+let _resize = { on: false, dir: "", sx: 0, sy: 0, sw: 0, sh: 0, sl: 0, st: 0 };
+const FP_MIN_W = 280, FP_MIN_H = 320;
+
+fpanel.querySelectorAll(".fp-resize").forEach(el => {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    _resize.on = true;
+    _resize.dir = el.dataset.dir || "se";
+    _resize.sx = e.clientX; _resize.sy = e.clientY;
+    _resize.sw = fpanel.offsetWidth;
+    _resize.sh = fpanel.offsetHeight;
+    _resize.sl = parseFloat(fpanel.style.left) || fpanel.offsetLeft;
+    _resize.st = parseFloat(fpanel.style.top) || fpanel.offsetTop;
+    el.setPointerCapture(e.pointerId);
+  });
+});
+
+document.addEventListener("pointermove", (e) => {
+  if (!_resize.on) return;
+  const dx = e.clientX - _resize.sx;
+  const dy = e.clientY - _resize.sy;
+  let nw = _resize.sw, nh = _resize.sh, nl = _resize.sl, nt = _resize.st;
+  const d = _resize.dir;
+  if (d.includes("e")) nw = Math.max(FP_MIN_W, _resize.sw + dx);
+  if (d.includes("w")) { nw = Math.max(FP_MIN_W, _resize.sw - dx); nl = _resize.sl + _resize.sw - nw; }
+  if (d.includes("s")) nh = Math.max(FP_MIN_H, _resize.sh + dy);
+  if (d.includes("n")) { nh = Math.max(FP_MIN_H, _resize.sh - dy); nt = _resize.st + _resize.sh - nh; }
+  /* 视口边界 */
+  if (nl < 4) { nl = 4; }
+  if (nt < 4) { nt = 4; }
+  if (nl + nw > innerWidth - 4) nw = innerWidth - 4 - nl;
+  if (nt + nh > innerHeight - 4) nh = innerHeight - 4 - nt;
+  fpanel.style.width = nw + "px";
+  fpanel.style.height = nh + "px";
+  fpanel.style.left = nl + "px";
+  fpanel.style.top = nt + "px";
+});
+
+document.addEventListener("pointerup", (e) => {
+  if (!_resize.on) return;
+  _resize.on = false;
+  /* 存储用户调整后的尺寸 */
+  try { localStorage.setItem("panel_size", JSON.stringify({w:fpanel.offsetWidth,h:fpanel.offsetHeight})); } catch(_){}
+});
 
 function savePetPos() {
   try { localStorage.setItem("pet_pos", JSON.stringify({x:parseFloat(bubble.style.left),y:parseFloat(bubble.style.top)})); } catch(_){}
