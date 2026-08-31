@@ -1422,7 +1422,7 @@ const PET_ACTS = {
   fall:      { prefix: "fall",      count: 51,  fps: 70  },
 };
 const FRAME_ACTS = ["idle","push","sleep","dance","walkleft","walkright","patpat","playcar","fall"];
-const PET_TRICKS = ["dance","patpat","playcar","fall","walkleft","walkright"];
+const PET_TRICKS = ["dance","patpat","playcar","fall","walkleft","walkright","sleep"];
 let _act = "idle";
 let _fi = 0;
 let _ft = null;
@@ -1484,14 +1484,11 @@ function setPetAction(a, once) {
   if (a === "idle") scheduleRandomTrick(); /* 回到待机后继续排程随机动作 */
 }
 function resetPetSleep() {
-  clearTimeout(_sleepT);
-  if (_act !== "sleep") {
-    _sleepT = setTimeout(() => setPetAction("sleep", true), 22000); /* once=true：睡一觉自动醒，不永久睡、不循环 */
-  }
+  clearTimeout(_sleepT);   // 不再自动安排 22s 强制睡觉；睡觉改为随机动作池的一员（见 PET_TRICKS）
 }
 function wakePet() { if (_act === "sleep") setPetAction("idle"); }
 
-/* 随机趣味动作：空闲时偶尔自发跳舞/拍拍/玩车/跌倒/踱步 */
+/* 随机趣味动作：空闲时偶尔自发跳舞/拍拍/玩车/跌倒/踱步/睡觉 */
 function scheduleRandomTrick() {
   clearTimeout(_trickT);
   _trickT = setTimeout(() => {
