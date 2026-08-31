@@ -675,8 +675,8 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
   animation: petFloat 3.4s ease-in-out infinite;
 }
 .pet-img {
-  height: 96px; width: 96px; object-fit: contain;
-  pointer-events: none; image-rendering: pixelated;
+  height: 124px; width: auto; object-fit: contain;
+  pointer-events: none; image-rendering: auto;
   filter: drop-shadow(0 8px 16px rgba(0,0,0,.16));
 }
 .float-bubble:hover .pet-img { filter: drop-shadow(0 12px 24px rgba(99,85,247,.34)); }
@@ -684,7 +684,7 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 .float-bubble:focus-visible { outline: 2px solid #6355f7; outline-offset: 4px; border-radius: 12px; }
 .float-bubble.dragging { animation: none !important; cursor: grabbing; }
 
-/* 皮克啾动作状态视觉叠加（在逐帧循环基础上） */
+/* 咕咕嘎嘎动作状态视觉叠加（在逐帧循环基础上） */
 .float-bubble.pet-talk .pet-img { animation: petBounce .35s ease-in-out 3; }
 .float-bubble.pet-sleep .pet-img { opacity: .55; filter: drop-shadow(0 4px 10px rgba(0,0,0,.1)) brightness(.75); }
 .float-bubble.pet-push .pet-img { animation: petWobble .3s ease-in-out; transform: rotate(-8deg) scale(1.08); }

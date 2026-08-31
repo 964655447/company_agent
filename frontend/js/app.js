@@ -1402,42 +1402,51 @@ const bubble = $("#float-bubble");
 const fpanel = $("#float-panel");
 let _drag = { on: false, sx: 0, sy: 0, sl: 0, st: 0, moved: false };
 
-/* 桌宠动作状态机（素材：呆啵宠物 · 皮克啾 8帧 PNG 精灵，80×80 RGBA透明） */
+/* 桌宠动作状态机（素材：呆啵宠物 · 咕咕嘎嘎 真实动作帧） */
 const petImg = $("#pet-img");
-const PET_FRAMES = 8;
-const PET_FRAME_MS = 200; /* 匹配原 act_conf.json frame_refresh=0.2 */
-let _petFrame = 0;
-let _petTimer = null;
-let _petAction = "idle";
-let _petSleepTimer = null;
+const PET_ACTS = {
+  idle:  { prefix: "idle", count: 66, fps: 120 },
+  push:  { prefix: "push", count: 51, fps: 60 },
+  sleep: { prefix: "sleep", count: 82, fps: 100 },
+};
+let _act = "idle";
+let _fi = 0;
+let _ft = null;
+let _sleepT = null;
 
-/* 逐帧循环：始终运行，通过 CSS class 叠加动作状态视觉效果 */
-function startPetFrames() {
-  if (_petTimer) return;
-  _petTimer = setInterval(() => {
-    _petFrame = (_petFrame + 1) % PET_FRAMES;
-    petImg.src = "assets/pet/frames/frame_" + _petFrame + ".png";
-  }, PET_FRAME_MS);
+function startPetFrames(action) {
+  const cfg = PET_ACTS[action] || PET_ACTS.idle;
+  clearInterval(_ft); _ft = null; _act = action; _fi = 0;
+  petImg.src = "assets/pet/frames/" + cfg.prefix + "_000.png";
+  _ft = setInterval(() => {
+    _fi = (_fi + 1) % cfg.count;
+    const n = String(_fi).padStart(3,"0");
+    petImg.src = "assets/pet/frames/" + cfg.prefix + "_" + n + ".png";
+  }, cfg.fps);
 }
 
+/* CSS class 叠加：talk/eating 复用 idle 帧 + 视觉效果；push/sleep 用真实帧 */
 function setPetAction(a) {
   const valid = ["idle","talk","sleep","push","eating"];
   if (!valid.includes(a)) a = "idle";
-  _petAction = a;
+  /* push/sleep 切换真实帧集，其余复用 idle 帧 + CSS */
+  if (a === "push") startPetFrames("push");
+  else if (a === "sleep") startPetFrames("sleep");
+  else if (_act !== "idle") startPetFrames("idle");
   bubble.className = "float-bubble" + (bubble.classList.contains("hidden") ? " hidden" : "") +
     (a !== "idle" ? " pet-" + a : "");
   resetPetSleep();
 }
 function resetPetSleep() {
-  clearTimeout(_petSleepTimer);
-  if (_petAction !== "sleep") {
-    _petSleepTimer = setTimeout(() => setPetAction("sleep"), 22000);
+  clearTimeout(_sleepT);
+  if (_act !== "sleep") {
+    _sleepT = setTimeout(() => setPetAction("sleep"), 22000);
   }
 }
-function wakePet() { if (_petAction === "sleep") setPetAction("idle"); }
+function wakePet() { if (_act === "sleep") setPetAction("idle"); }
 
 /* 启动帧循环 */
-startPetFrames();
+startPetFrames("idle");
 resetPetSleep();
 
 (function initPetPos() {
