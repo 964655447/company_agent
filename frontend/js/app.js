@@ -1464,6 +1464,15 @@ function startPetFrames(action, once) {
 function setPetAction(a, once) {
   const valid = ["idle","talk","sleep","push","eating","dance","walkleft","walkright","patpat","playcar","fall"];
   if (!valid.includes(a)) a = "idle";
+  if (a === "walkleft" || a === "walkright") {
+    /* 走动：循环播放走路帧 + 实际水平位移，走到视口边缘自动停下回待机 */
+    bubble.className = "float-bubble" + (bubble.classList.contains("hidden") ? " hidden" : "") + " pet-" + a;
+    startPetFrames(a, false);
+    startWalk(a === "walkleft" ? -1 : 1);
+    resetPetSleep();
+    return;
+  }
+  stopWalk(); /* 切到其它动作时停止走动 */
   if (FRAME_ACTS.includes(a)) {
     startPetFrames(a, !!once);
   } else if (_act !== "idle") {
@@ -1529,6 +1538,7 @@ function savePetPos() {
 function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
 let _physRAF = null;
 function startPhysics(vx, vy) {
+  stopWalk();                      // 走动与抛物互斥
   _drag.on = true;                 // 物理活动中：阻止随机动作 & 标记占用
   let last = performance.now();
   const step = (now) => {
@@ -1560,7 +1570,40 @@ function stopPhysics() {
   setPetAction("idle");
 }
 
+/* 走动：触发 walkleft/walkright 时让宠物沿该方向实际平移，到视口边缘停下回待机 */
+let _walkRAF = null;
+function stopWalk() {
+  if (_walkRAF) { cancelAnimationFrame(_walkRAF); _walkRAF = null; }
+}
+function _endWalk() {
+  stopWalk();
+  _drag.on = false;
+  savePetPos();
+  setPetAction("idle");
+}
+function startWalk(dir) {
+  stopWalk();
+  _drag.on = true;              // 占用中，屏蔽随机动作
+  let last = performance.now();
+  const speed = 0.16;           // 水平速度 px/ms（约 160px/s）
+  const step = (now) => {
+    let dt = now - last; last = now;
+    if (dt > 40) dt = 40; if (dt < 0) dt = 0;
+    const W = bubble.offsetWidth;
+    let x = parseFloat(bubble.style.left) || 0;
+    const vw = innerWidth;
+    x += dir * speed * dt;
+    if (x <= 0) { x = 0; _endWalk(); return; }
+    if (x + W >= vw) { x = vw - W; _endWalk(); return; }
+    bubble.style.left = x + "px";
+    if (!fpanel.classList.contains("hidden")) syncPanelToPet();
+    _walkRAF = requestAnimationFrame(step);
+  };
+  _walkRAF = requestAnimationFrame(step);
+}
+
 bubble.addEventListener("pointerdown", (e) => {
+  stopWalk();                     // 走动中再次按下 → 先停下
   if (_physRAF) stopPhysics();     // 物理下落中再次按下 → 先定格再拖
   wakePet();
   _drag.on = true; _drag.grabbing = true; _drag.moved = false;
