@@ -544,6 +544,20 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 .material-raw::-webkit-scrollbar { width: 8px; height: 8px; }
 .material-raw::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 99px; border: none; }
 .material-raw::-webkit-scrollbar-track { background: transparent; }
+/* ---- 结构化材料信息卡片 ---- */
+.mat-card { display: flex; flex-direction: column; gap: 14px; }
+.mat-field { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: var(--bg-soft); border-radius: 10px; border: 1px solid var(--line); }
+.mat-field-files { align-items: stretch; }
+.mat-label { flex-shrink: 0; width: 72px; font-size: 12.5px; color: var(--ink-3); font-weight: 500; padding-top: 2px; }
+.mat-value { flex: 1; font-size: 14px; color: var(--ink); min-width: 0; word-break: break-all; }
+.mat-amount { font-size: 22px; font-weight: 700; color: var(--primary); letter-spacing: -0.3px; }
+.mat-placeholder { color: var(--ink-4); font-style: italic; }
+.mat-file-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.mat-file { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; color: var(--ink); cursor: default; transition: border-color .15s, box-shadow .15s; }
+.mat-file:hover { border-color: var(--primary-soft); box-shadow: 0 0 0 3px var(--primary-fade); }
+.mat-file-ico { font-size: 14px; flex-shrink: 0; }
+.tag-purple { background: #f0ecfd; color: #7c3aed; border: 1px solid #e4d9fa; }
+
 .material-empty { color: var(--ink-3); font-size: 13px; font-style: italic; text-align: center; padding: 18px 0; }
 
 .material-modal-actions { padding: 12px 24px 18px; border-top: 1px solid var(--line); background: #fbfcff; }

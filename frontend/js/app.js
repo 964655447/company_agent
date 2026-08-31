@@ -99,18 +99,41 @@ function openMaterialModal(record) {
   $("#material-modal-title").textContent = `报销单 #${record.id} · 材料信息`;
   $("#material-modal-sub").textContent = `提交于 ${fmtDT(record.submit_time)} · 状态：${statusTxt}`;
 
-  // 尝试美化 JSON；失败则按原文本展示
-  let pretty = raw;
-  if (raw) {
-    try {
-      const obj = JSON.parse(raw);
-      pretty = JSON.stringify(obj, null, 2);
-    } catch (e) { /* 保留原文 */ }
-  }
   const body = $("#material-modal-body");
-  body.innerHTML = raw
-    ? `<pre class="material-raw">${esc(pretty)}</pre>`
-    : `<div class="material-empty">该报销单暂无材料信息（ocr_raw 为空）</div>`;
+  if (!raw) {
+    body.innerHTML = `<div class="material-empty">该报销单暂无材料信息（ocr_raw 为空）</div>`;
+    $("#material-modal-backdrop").classList.add("show");
+    document.body.classList.add("no-scroll");
+    return;
+  }
+
+  let obj;
+  try { obj = JSON.parse(raw); } catch (e) {
+    body.innerHTML = `<pre class="material-raw">${esc(raw)}</pre>`;
+    $("#material-modal-backdrop").classList.add("show");
+    document.body.classList.add("no-scroll");
+    return;
+  }
+
+  // 结构化渲染
+  const fields = [];
+  if (obj.category) {
+    fields.push(`<div class="mat-field"><span class="mat-label">报销类目</span><span class="mat-value"><span class="tag tag-purple">${esc(obj.category)}</span></span></div>`);
+  }
+  if (obj.amount != null) {
+    fields.push(`<div class="mat-field"><span class="mat-label">报销金额</span><span class="mat-value mat-amount">¥${Number(obj.amount).toLocaleString("zh-CN", {minimumFractionDigits: 2})}</span></div>`);
+  }
+  if (obj.desc != null) {
+    fields.push(`<div class="mat-field"><span class="mat-label">备注说明</span><span class="mat-value">${esc(obj.desc) || "<span class='mat-placeholder'>无</span>"}</span></div>`);
+  }
+  if (obj.files && Array.isArray(obj.files) && obj.files.length) {
+    const fileItems = obj.files.map(f =>
+      `<div class="mat-file"><span class="mat-file-ico">📎</span><span class="mat-file-name">${esc(f)}</span></div>`
+    ).join("");
+    fields.push(`<div class="mat-field mat-field-files"><span class="mat-label">附件材料</span><span class="mat-value"><div class="mat-file-list">${fileItems}</div></span></div>`);
+  }
+
+  body.innerHTML = `<div class="mat-card">${fields.join("")}</div>`;
 
   $("#material-modal-backdrop").classList.add("show");
   document.body.classList.add("no-scroll");
