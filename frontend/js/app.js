@@ -859,18 +859,18 @@ function appendFloatTyping() {
   return el;
 }
 
-/* 统一发送：文字走 /api/chat（统一智能体）；带文件走 /api/chat/file（阅卷） */
-async function askFloat(message, mode = "chat", fileObj = null) {
-  if (!message || !message.trim()) return;
-  if (mode !== "upload") appendFloatMsg("user", message.trim());
+/* 统一发送：文字走 /api/chat（统一智能体）；带文件走 /api/chat/file */
+async function askFloat(message, fileObj = null) {
+  if (!message || !message.trim() && !fileObj) return;
+  if (!fileObj) appendFloatMsg("user", message.trim());
+  else appendFloatMsg("user", `📎 ${esc(fileObj.name)}${message ? " · " + message : ""}`);
   const typing = appendFloatTyping();
-  const sendBtn = (mode === "upload") ? $("#float-gradesend") : $("#float-send");
-  if (sendBtn) sendBtn.disabled = true;
+  $("#float-send").disabled = true;
   try {
     let r;
-    if (mode === "upload" && fileObj) {
+    if (fileObj) {
       const fd = new FormData();
-      fd.append("message", message);
+      if (message && message.trim()) fd.append("message", message.trim());
       fd.append("file", fileObj);
       r = await api("/api/chat/file", { method: "POST", body: fd });
     } else {
@@ -882,11 +882,36 @@ async function askFloat(message, mode = "chat", fileObj = null) {
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
   } finally {
-    if (sendBtn) sendBtn.disabled = false;
+    $("#float-send").disabled = false;
+    clearFloatFile(); // 发送后清掉已选文件
     $("#float-log").scrollTop = $("#float-log").scrollHeight;
   }
 }
 
+/* 📎 文件选择与预览条 */
+const floatFileInput = $("#float-file");
+const floatFileChip = $("#float-file-chip");
+const floatFileChipName = $("#float-file-chip-name");
+
+function clearFloatFile() {
+  floatFileInput.value = "";
+  floatFileChip.classList.add("hidden");
+  floatFileChipName.textContent = "";
+}
+
+function showFloatFile(name) {
+  floatFileChipName.textContent = name;
+  floatFileChip.classList.remove("hidden");
+}
+
+$("#float-attach").addEventListener("click", () => floatFileInput.click());
+floatFileInput.addEventListener("change", () => {
+  const f = floatFileInput.files[0];
+  if (f) showFloatFile(f.name); else clearFloatFile();
+});
+$("#float-file-chip-del").addEventListener("click", () => clearFloatFile());
+
+/* 悬浮球事件绑定 */
 $("#float-bubble").addEventListener("click", () => floatTogglePanel());
 $("#float-bubble").addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
@@ -895,36 +920,17 @@ $("#float-close").addEventListener("click", () => floatTogglePanel(false));
 $("#float-quick").addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
-  const mode = btn.dataset.mode || "chat";
-  if (mode === "upload") {              // 展开/收起阅卷上传区
-    $("#float-upload").classList.toggle("hidden");
-    return;
-  }
   let q = btn.dataset.q || "";
   q = q.replace("{emp_id}", state.user?.emp_id ?? "")
        .replace("{position}", state.user?.position ?? "");
-  if (q) askFloat(q, "chat");
+  if (q) askFloat(q, null); // chip 只发文字
 });
 $("#float-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const v = $("#float-input").value.trim();
+  const f = floatFileInput.files[0];
   $("#float-input").value = "";
-  if (v) askFloat(v, "chat");
-});
-/* 阅卷上传 */
-const floatFileInput = $("#float-file");
-floatFileInput.addEventListener("change", () => {
-  const f = floatFileInput.files[0];
-  $("#float-file-name").textContent = f ? f.name : "未选择文件";
-});
-$("#float-gradesend").addEventListener("click", () => {
-  const f = floatFileInput.files[0];
-  if (!f) { appendFloatMsg("bot", "请先选择要批改的试卷文件（Word 文档）"); return; }
-  const empId = state.user?.emp_id ?? "";
-  askFloat(`请批改这份试卷（工号 ${empId}）`, "upload", f);
-  floatFileInput.value = "";
-  $("#float-file-name").textContent = "未选择文件";
-  $("#float-upload").classList.add("hidden");
+  if (v || f) askFloat(v, f || null); // 有文件就走 /api/chat/file
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !$("#float-panel").classList.contains("hidden")) floatTogglePanel(false);

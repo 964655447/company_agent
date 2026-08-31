@@ -314,22 +314,19 @@
     <button data-mode="chat" data-q="这个月我考勤多少天？">考勤查询</button>
     <button data-mode="chat" data-q="生成员工{emp_id}的考核评估报告">生成考核报告</button>
     <button data-mode="chat" data-q="请出一份{position}的岗位测试试卷">出岗位试卷</button>
-    <button data-mode="upload">阅试卷·上传</button>
   </div>
-  <div class="float-upload hidden" id="float-upload">
-    <div class="float-upload-row">
-      <input type="file" id="float-file" accept=".doc,.docx,.pdf,.txt">
-    </div>
-    <div class="float-upload-meta">
-      <span id="float-file-name" class="float-file-name">未选择文件</span>
-      <span class="float-emp">工号：<b id="float-emp-id"></b></span>
-    </div>
-    <button class="btn-primary btn-sm" id="float-gradesend">上传并批改</button>
-  </div>
+  <!-- 隐藏的文件选择器（由📎按钮触发） -->
+  <input type="file" id="float-file" class="hidden" accept=".doc,.docx,.pdf,.txt">
   <form id="float-form" class="float-input-row">
+    <button type="button" class="float-attach" id="float-attach" title="上传文件（试卷/文档）">📎</button>
     <input id="float-input" placeholder="如：生成我的考核报告 / 自由提问" autocomplete="off">
     <button type="submit" class="btn-primary btn-sm" id="float-send">发送</button>
   </form>
+  <!-- 已选文件预览条（选文件后显示） -->
+  <div class="float-file-chip hidden" id="float-file-chip">
+    <span class="float-file-chip-name" id="float-file-chip-name"></span>
+    <button type="button" class="float-file-chip-del" id="float-file-chip-del" title="移除文件">×</button>
+  </div>
 </div>
 
 <!-- ================= 全局反馈层 ================= -->
