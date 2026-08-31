@@ -1664,13 +1664,13 @@ bubble.addEventListener("pointerdown", (e) => {
   if (_physRAF) stopPhysics();     // 物理下落中再次按下 → 先定格再拖
   wakePet();
   _drag.on = true; _drag.grabbing = true; _drag.moved = false;
+  _drag.pid = e.pointerId;       // 记录 pointerId，仅拖动开始时才 setPointerCapture（避免纯点击吞掉 pointerup）
   _drag.sx = e.clientX; _drag.sy = e.clientY;
   _drag.vx = 0; _drag.vy = 0;
   _drag.lastX = e.clientX; _drag.lastY = e.clientY; _drag.lastT = performance.now();
   const r = bubble.getBoundingClientRect();
   _drag.sl = r.left; _drag.st = r.top;
   bubble.classList.add("dragging");
-  bubble.setPointerCapture(e.pointerId);
 });
 document.addEventListener("pointermove", (e) => {
   if (!_drag.grabbing) return;   // 仅按住拖拽时跟随；物理飞行/hover 时不跟随，避免松手后瞬移回鼠标
@@ -1686,7 +1686,7 @@ document.addEventListener("pointermove", (e) => {
   _drag.lastX = e.clientX; _drag.lastY = e.clientY; _drag.lastT = nowT;
   const dx = e.clientX - _drag.sx, dy = e.clientY - _drag.sy;
   if (Math.abs(dx) > PET_DRAG_THRESHOLD || Math.abs(dy) > PET_DRAG_THRESHOLD) {
-    if (!_drag.moved) setPetAction("push");   /* 被拖/被推的互动动作 */
+    if (!_drag.moved) { setPetAction("push"); try { bubble.setPointerCapture(_drag.pid); } catch(_){} } /* 开始拖动才捕获，指针移出元素也跟手 */
     _drag.moved = true;
   }
   let nx = Math.max(0, Math.min(_drag.sl + dx, innerWidth - bubble.offsetWidth));
