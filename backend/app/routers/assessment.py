@@ -50,6 +50,15 @@ async def query_position(body: QueryIn,
     if not position:
         return {"intro": "请输入想了解的岗位名称"}
     result = wf4_fallback(position)
+    # 结合实际数据：当前在岗人数 + 本人对该岗位的历史成绩
+    holders = db.scalars(select(Employee).where(Employee.position == position)).all()
+    result["holders_count"] = len(holders)
+    my_stats = db.scalars(select(AssessmentStat).where(
+        AssessmentStat.employee_id == user.employee_id,
+        AssessmentStat.target_position == position,
+    )).all()
+    valid = [s.score for s in my_stats if s.score is not None]
+    result["my_score"] = round(max(valid), 1) if valid else None
     db.add(AssessmentLog(employee_id=user.employee_id, position_queried=position))
     db.commit()
     return result

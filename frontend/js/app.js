@@ -512,6 +512,23 @@ async function loadMySalary() {
 }
 
 /* ---------------- 考核 ---------------- */
+// 成绩分档：返回 {txt 标签, cls 颜色类, pct 进度条%}
+function scoreBand(score) {
+  if (score == null) return { txt: "无成绩", cls: "tag-gray", pct: 0 };
+  if (score >= 90) return { txt: "优秀", cls: "tag-ok", pct: Math.min(100, score) };
+  if (score >= 80) return { txt: "良好", cls: "tag-info", pct: Math.min(100, score) };
+  if (score >= 60) return { txt: "合格", cls: "tag-warn", pct: Math.min(100, score) };
+  return { txt: "待提升", cls: "tag-danger", pct: Math.min(100, score) };
+}
+// 查询岗位「实际关联」里我的成绩
+function relMyScore(score) {
+  if (score == null) return `<div class="assess-rel-num" style="font-size:14px">尚未参加过该岗位考核</div>
+    <div class="assess-rel-label">可在下方参加本岗位考核</div>`;
+  const b = scoreBand(score);
+  return `<div class="assess-rel-num">${score}<small> 分</small></div>
+    <div class="assess-rel-label">你对该岗位的历史成绩 · <span class="tag ${b.cls}">${b.txt}</span></div>`;
+}
+
 $("#assess-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const pos = $("#assess-position").value.trim();
@@ -519,6 +536,15 @@ $("#assess-form").addEventListener("submit", async (e) => {
   $("#assess-result").innerHTML = `<div class="card assess-card"><p>查询中…</p></div>`;
   try {
     const r = await api("/api/assessment/query", { method: "POST", json: { position: pos } });
+    const relHtml = `
+      <div class="assess-sub">实际关联</div>
+      <div class="assess-rel">
+        <div class="assess-rel-item"><span class="assess-rel-ico">👥</span>
+          <div><div class="assess-rel-num">${r.holders_count ?? 0}<small> 人</small></div>
+          <div class="assess-rel-label">当前在岗人数</div></div></div>
+        <div class="assess-rel-item"><span class="assess-rel-ico">🎯</span>
+          <div>${relMyScore(r.my_score)}</div></div>
+      </div>`;
     $("#assess-result").innerHTML = `
       <div class="card assess-card">
         <h4>${esc(pos)}</h4>
@@ -529,6 +555,7 @@ $("#assess-form").addEventListener("submit", async (e) => {
         <div class="chip-row">${(r.management_abilities || []).map((s) => `<span class="chip alt">${esc(s)}</span>`).join("") || "<span style='color:var(--ink-3)'>暂无</span>"}</div>
         <div class="assess-sub">建议发展路径</div>
         <ol style="padding-left:20px;color:var(--ink-2);font-size:13.5px">${(r.suggested_path || []).map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+        ${relHtml}
       </div>`;
   } catch (err) {
     $("#assess-result").innerHTML = `<div class="card assess-card"><p style="color:var(--danger)">${esc(err.message)}</p></div>`;
@@ -547,19 +574,36 @@ async function loadMyScores() {
     const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : "";
     $("#assess-range").textContent = range ? `统计区间：${range}` : "";
     if (!list.length) {
-      wrap.innerHTML = `<p class="form-tip">暂无考核成绩记录。</p>`;
+      wrap.innerHTML = `<p class="form-tip">暂无考核成绩记录。参加岗位考核后，这里会显示你的成绩与能力发展轨迹。</p>`;
       return;
     }
-    wrap.innerHTML = `
-      <div class="table-wrap"><table class="tbl">
-        <thead><tr><th>原岗位</th><th>意向岗位</th><th>成绩</th><th>测试时间</th></tr></thead>
-        <tbody>${list.map((s) => `
-          <tr><td>${esc(s.original_position || "-")}</td>
-              <td>${esc(s.target_position || "-")}</td>
-              <td>${s.score ?? "-"}</td>
-              <td>${s.test_time ? s.test_time.slice(0, 10) : "-"}</td></tr>`).join("")}
-        </tbody>
-      </table></div>`;
+    // 概览统计（基于真实成绩）
+    const scores = list.map((s) => s.score).filter((v) => v != null);
+    const avg = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const max = scores.length ? Math.max(...scores) : 0;
+    const pass = scores.filter((v) => v >= 60).length;
+    const overview = `<div class="assess-overview">
+      ${statCard("考核次数", list.length, "次")}
+      ${statCard("平均分", avg.toFixed(1), "分")}
+      ${statCard("最高分", max.toFixed(1), "分")}
+      ${statCard("合格次数", `${pass}/${list.length}`)}
+    </div>`;
+    const cards = list.map((s) => {
+      const b = scoreBand(s.score);
+      const pct = b.pct;
+      return `<div class="score-card">
+        <div class="score-card-route">${esc(s.original_position || "—")} <span class="score-arrow">→</span> ${esc(s.target_position || "—")}</div>
+        <div class="score-card-body">
+          <div class="score-card-num ${b.cls === "tag-danger" ? "is-low" : ""}">${s.score != null ? s.score : "—"}<small>分</small></div>
+          <div class="score-card-meta">
+            <span class="tag ${b.cls}">${b.txt}</span>
+            <span class="score-card-date">${s.test_time ? s.test_time.slice(0, 10) : ""}</span>
+          </div>
+        </div>
+        <div class="score-bar${b.cls === "tag-danger" ? " is-low" : ""}"><span style="width:${pct}%"></span></div>
+      </div>`;
+    }).join("");
+    wrap.innerHTML = `${overview}<div class="score-cards">${cards}</div>`;
   } catch (err) {
     wrap.innerHTML = `<p style="color:var(--danger)">${esc(err.message)}</p>`;
   }

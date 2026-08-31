@@ -421,6 +421,35 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 .chip.alt { background: var(--ok-soft); color: var(--ok); border-color: rgba(14, 159, 110, .16); }
 .assess-sub { font-size: 12.5px; color: var(--ink-3); margin: 14px 0 7px; font-weight: 600; letter-spacing: 1px; }
 
+/* ---- 查询岗位：实际关联 ---- */
+.assess-rel { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.assess-rel-item { flex: 1; min-width: 150px; display: flex; gap: 10px; align-items: center;
+  background: var(--bg-soft); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.assess-rel-ico { font-size: 20px; flex-shrink: 0; }
+.assess-rel-num { font-size: 22px; font-weight: 700; color: var(--ink); line-height: 1.1; }
+.assess-rel-num small { font-size: 12px; font-weight: 500; color: var(--ink-3); }
+.assess-rel-label { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; }
+
+/* ---- 我的考核成绩：概览 + 卡片 ---- */
+.assess-overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.score-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.score-card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+  box-shadow: 0 2px 8px rgba(31, 41, 71, .04); transition: box-shadow .15s, transform .15s; }
+.score-card:hover { box-shadow: 0 6px 18px rgba(31, 41, 71, .09); transform: translateY(-2px); }
+.score-card-route { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+.score-arrow { color: var(--primary); margin: 0 4px; }
+.score-card-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.score-card-num { font-size: 30px; font-weight: 800; color: var(--primary); line-height: 1; }
+.score-card-num small { font-size: 13px; font-weight: 600; color: var(--ink-3); margin-left: 2px; }
+.score-card-num.is-low { color: var(--danger); }
+.score-card-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.score-card-date { font-size: 11.5px; color: var(--ink-4); }
+.score-bar { height: 7px; background: var(--bg-soft); border-radius: 99px; margin-top: 12px; overflow: hidden; }
+.score-bar > span { display: block; height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--primary), #8b7bf7); transition: width .4s ease; }
+.score-bar.is-low > span { background: linear-gradient(90deg, var(--danger), #f87171); }
+@media (max-width: 640px) { .assess-overview { grid-template-columns: repeat(2, 1fr); } }
+
 /* ---------------- 聊天 ---------------- */
 .chat-card { display: flex; flex-direction: column; height: calc(100vh - 180px); min-height: 430px; }
 .chat-log { flex: 1; overflow-y: auto; padding: 8px 6px; display: flex; flex-direction: column; gap: 15px; }
