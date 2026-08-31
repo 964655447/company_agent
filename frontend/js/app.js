@@ -1440,9 +1440,10 @@ function startPetFrames(action, once) {
       const n = String(_fi).padStart(3, "0");
       petImg.src = "assets/pet/frames/" + cfg.prefix + "_" + n + ".png";
     }, cfg.fps);
-    /* 长动画（如跳舞 241 帧）最多播 5.5s 自动收尾，避免停在中间帧 */
-    if (cfg.count * cfg.fps > 5500) {
-      _trickForceT = setTimeout(() => { if (_act === action) setPetAction("idle"); }, 5500);
+    /* 长动画（如跳舞 241 帧）按完整时长 + 1.5s 缓冲收尾，避免卡在中间帧，也不再提前截断 */
+    const durMs = cfg.count * cfg.fps;
+    if (durMs > 6000) {
+      _trickForceT = setTimeout(() => { if (_act === action) setPetAction("idle"); }, durMs + 1500);
     }
   } else {
     _ft = setInterval(() => {
