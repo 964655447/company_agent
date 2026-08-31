@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..local_rules import wf4_fallback
+from ..local_rules import wf4_fallback, wf5_fallback
 from ..models import AssessmentLog, AssessmentStat, Employee
 from ..security import get_current_user, require_manager
 
@@ -34,8 +34,6 @@ def _assess_period_range(period: str, target_month: str | None):
               first.replace(year=first.year + 1, month=1) - timedelta(days=1)
         return first, last
     return today.replace(day=1), today
-
-router = APIRouter(prefix="/api/assessment", tags=["进阶考核"])
 
 
 class QueryIn(BaseModel):
@@ -133,4 +131,136 @@ def all_scores(
         "scores": [{"name": r[1], **r[0].to_dict()} for r in rows],
         "range_start": str(start) if start else "",
         "range_end": str(end) if end else "",
+    }
+
+
+# ============================================================
+# 考核出题 + 答题提交（申请考核完整流程）
+# ============================================================
+
+class GenerateIn(BaseModel):
+    target_position: str
+
+
+class AnswerItem(BaseModel):
+    question_id: int
+    user_answer: list[int]  # 用户选中的选项索引列表（单选也用 list，长度=1）
+
+
+class SubmitIn(BaseModel):
+    target_position: str
+    original_position: str = ""
+    answers: list[AnswerItem]
+
+
+@router.post("/generate")
+async def generate_quiz(
+    body: GenerateIn,
+    user: Employee = Depends(get_current_user),
+):
+    """为指定岗位生成考核试题。优先调 Dify 工作流，降级本地模板。"""
+    pos = body.target_position.strip()
+    if not pos:
+        return {"error": "请选择目标岗位", "questions": []}
+
+    # TODO: Dify 接通后替换为 call_dify_workflow("job_description and test_generation", ...)
+    # 当前使用本地 fallback
+    result = wf5_fallback(pos)
+
+    return {
+        "target_position": pos,
+        "total_questions": result["total_questions"],
+        "max_score": result["max_score"],
+        "questions": result["questions"],
+        "source": result.get("source", "local_fallback"),
+    }
+
+
+@router.post("/submit")
+async def submit_quiz(
+    body: SubmitIn,
+    user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """提交答卷 → 本地打分 → 写入 AssessmentStat 表 → 返回成绩单。"""
+    pos = body.target_position.strip()
+    orig_pos = body.original_position.strip() or user.position
+
+    if not body.answers:
+        return {"error": "答卷不能为空", "score": None}
+
+    # 重新生成该岗位的标准答案（与 generate 一致）
+    standard = wf5_fallback(pos)
+    answer_map = {q["id"]: q for q in standard["questions"]}
+
+    breakdown = []
+    total = 0.0
+    single_total = 0.0
+    multi_total = 0.0
+    judge_total = 0.0
+
+    for ans_item in body.answers:
+        qid = ans_item.question_id
+        std_q = answer_map.get(qid)
+        if not std_q:
+            continue
+
+        user_ans = ans_item.user_answer or []
+        correct_ans = std_q["answer"]
+        pts = std_q["points"]
+        qtype = std_q["type"]
+
+        if qtype == "single":
+            earned = pts if user_ans and user_ans[0] == correct_ans else 0
+            single_total += earned
+        elif qtype == "multi":
+            if not user_ans or set(user_ans) - set(correct_ans):
+                earned = 0
+            elif set(user_ans) == set(correct_ans):
+                earned = pts
+            else:
+                earned = round(len(set(user_ans) & set(correct_ans)) * (pts / len(correct_ans)), 2)
+            multi_total += earned
+        elif qtype == "judge":
+            earned = pts if user_ans and user_ans[0] == correct_ans else 0
+            judge_total += earned
+        else:
+            earned = 0
+
+        total += earned
+        breakdown.append({
+            "question_id": qid,
+            "type": qtype,
+            "question": std_q["question"],
+            "user_answer": user_ans,
+            "correct_answer": correct_ans,
+            "points": pts,
+            "earned": earned,
+            "is_correct": earned == pts,
+        })
+
+    total = round(total, 1)
+    band = "优秀" if total >= 90 else "良好" if total >= 80 else "合格" if total >= 60 else "待提升"
+
+    stat = AssessmentStat(
+        employee_id=user.employee_id,
+        original_position=orig_pos,
+        target_position=pos,
+        score=total,
+        test_time=datetime.now(),
+    )
+    db.add(stat)
+    db.commit()
+
+    return {
+        "score": total,
+        "band": band,
+        "max_score": 100,
+        "single_score": round(single_total, 1),
+        "multi_score": round(multi_total, 1),
+        "judge_score": round(judge_total, 1),
+        "breakdown": breakdown,
+        "original_position": orig_pos,
+        "target_position": pos,
+        "test_time": stat.test_time.isoformat() if stat.test_time else None,
     }

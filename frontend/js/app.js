@@ -562,6 +562,175 @@ $("#assess-form").addEventListener("submit", async (e) => {
   }
 });
 
+/* ---------------- 考核申请 / 答题 ---------------- */
+let quizData = null;  // 当前试卷数据（含标准答案，不暴露给前端DOM）
+
+$("#btn-start-quiz").addEventListener("click", async () => {
+  const pos = $("#quiz-position").value.trim();
+  if (!pos) { alert("请先选择目标岗位"); return; }
+
+  $("#btn-start-quiz").disabled = true;
+  $("#btn-start-quiz").textContent = "出题中…";
+  $("#quiz-container").innerHTML = `<p class="form-tip">正在生成{esc(pos)}岗位考核试题…</p>`;
+  $("#quiz-container").classList.remove("hidden");
+  $("#quiz-result").classList.add("hidden");
+
+  try {
+    const r = await api("/api/assessment/generate", { method: "POST", json: { target_position: pos } });
+    if (r.error) { throw new Error(r.error); }
+    quizData = r;
+    renderQuiz(r);
+  } catch (err) {
+    $("#quiz-container").innerHTML = `<p style="color:var(--danger)">出题失败：${esc(err.message)}</p>`;
+  } finally {
+    $("#btn-start-quiz").disabled = false;
+    $("#btn-start-quiz").textContent = "开始考核";
+  }
+});
+
+function renderQuiz(data) {
+  const qs = data.questions || [];
+  let html = `
+    <div class="quiz-header">
+      <span><strong>${esc(data.target_position)}</strong> 岗位考核</span>
+      <span class="quiz-progress">共 ${qs} 题 · 满分 ${data.max_score} 分</span>
+    </div>
+    <div class="quiz-body">`;
+
+  qs.forEach((q, i) => {
+    const typeLabel = q.type === "single" ? "单选题" : q.type === "multi" ? "多选题" : "判断题";
+    const ptsLabel = `(${q.points}分)`;
+    html += `
+      <div class="quiz-q" data-qid="${q.id}" data-type="${q.type}">
+        <div class="quiz-q-head"><span class="quiz-q-num">第${i + 1}题</span>
+          <span class="quiz-q-type">${typeLabel}</span><span class="quiz-q-pts">${ptsLabel}</span>
+        </div>
+        <div class="quiz-q-text">${esc(q.question)}</div>
+        <div class="quiz-q-opts">`;
+
+    q.options.forEach((opt, oi) => {
+      if (q.type === "multi") {
+        html += `<label class="quiz-opt quiz-opt-multi"><input type="checkbox" name="q_${q.id}" value="${oi}"><span>${esc(opt)}</span></label>`;
+      } else {
+        html += `<label class="quiz-opt"><input type="radio" name="q_${q.id}" value="${oi}"><span>${esc(opt)}</span></label>`;
+      }
+    });
+
+    html += `</div></div>`;
+  });
+
+  html += `
+    </div>
+    <div class="quiz-foot">
+      <button class="btn-primary" id="btn-submit-quiz">提交答卷</button>
+    </div>`;
+
+  $("#quiz-container").innerHTML = html;
+  $("#quiz-apply").classList.add("hidden");
+
+  // 绑定提交
+  $("#btn-submit-quiz").addEventListener("click", submitQuiz);
+}
+
+async function submitQuiz() {
+  if (!quizData || !quizData.questions.length) return;
+
+  const answers = [];
+  let allAnswered = true;
+
+  for (const q of quizData.questions) {
+    const el = document.querySelector(`.quiz-q[data-qid="${q.id}"]`);
+    if (!el) continue;
+
+    let userAns = [];
+    if (q.type === "multi") {
+      const cbs = el.querySelectorAll('input[type="checkbox"]:checked');
+      cbs.forEach(cb => userAns.push(parseInt(cb.value)));
+    } else {
+      const rd = el.querySelector('input[type="radio"]:checked');
+      if (rd) userAns.push(parseInt(rd.value));
+    }
+
+    if (userAns.length === 0) allAnswered = false;
+    answers.push({ question_id: q.id, user_answer: userAns });
+  }
+
+  if (!allAnswered) {
+    if (!confirm("有未完成的题目，确定提交吗？")) return;
+  }
+
+  $("#btn-submit-quiz").disabled = true;
+  $("#btn-submit-quiz").textContent = "批改中…";
+
+  try {
+    const r = await api("/api/assessment/submit", {
+      method: "POST",
+      json: {
+        target_position: quizData.target_position,
+        original_position: state.user?.position || "",
+        answers,
+      },
+    });
+
+    renderQuizResult(r);
+    // 刷新成绩列表
+    loadMyScores();
+  } catch (err) {
+    alert("提交失败：" + err.message);
+  } finally {
+    $("#btn-submit-quiz").disabled = false;
+    $("#btn-submit-quiz").textContent = "提交答卷";
+  }
+}
+
+function renderQuizResult(r) {
+  $("#quiz-container").classList.add("hidden");
+  const resEl = $("#quiz-result");
+  resEl.classList.remove("hidden");
+
+  const bandCls = r.score >= 90 ? "tag-success" : r.score >= 80 ? "tag-info" : r.score >= 60 ? "tag-warn" : "tag-danger";
+
+  let breakdownHtml = "";
+  if (r.breakdown) {
+    breakdownHtml = `<div class="quiz-bd"><table class="tbl">
+      <thead><tr><th>题号</th><th>题型</th><th>你的答案</th><th>正确答案</th><th>得分</th></tr></thead><tbody>`;
+    for (const b of r.breakdown) {
+      const icon = b.is_correct ? "✅" : "❌";
+      const correctOpts = (Array.isArray(b.correct_answer) ? b.correct_answer : [b.correct_answer])
+        .map(i => String.fromCharCode(65 + i)).join(",");
+      const userOpts = (b.user_answer || []).map(i => String.fromCharCode(65 + i)).join(",") || "未作答";
+      breakdownHtml += `<tr style="${b.is_correct ? "" : "color:var(--danger)"}">
+        <td>${icon} #${b.question_id}</td>
+        <td>${b.type === "single" ? "单选" : b.type === "multi" ? "多选" : "判断"}</td>
+        <td>${userOpts}</td><td>${correctOpts}</td><td><strong>${b.earned}/${b.points}</strong></td></tr>`;
+    }
+    breakdownHtml += `</tbody></table></div>`;
+  }
+
+  resEl.innerHTML = `
+    <div class="quiz-score-card">
+      <div class="quiz-score-big">${r.score}<small> / ${r.max_score}</small></div>
+      <div class="quiz-score-band"><span class="tag ${bandCls}">${r.band}</span></div>
+      <div class="quiz-score-sub">${esc(r.original_position)} → ${esc(r.target_position)} · ${r.test_time?.slice(0,16) || ""}</div>
+    </div>
+    <div class="quiz-score-detail">
+      ${statCard("单选题", `${r.single_score ?? 0}/24`)}
+      ${statCard("多选题", `${r.multi_score ?? 0}/52`)}
+      ${statCard("判断题", `${r.judge_score ?? 0}/24`)}
+    </div>
+    ${breakdownHtml}
+    <div style="margin-top:16px;text-align:center">
+      <button class="btn-primary" id="btn-retake-quiz">重新考核</button>
+    </div>`;
+
+  // 重新考核按钮：回到选岗界面
+  $("#btn-retake-quiz").addEventListener("click", () => {
+    resEl.classList.add("hidden");
+    $("#quiz-apply").classList.remove("hidden");
+    quizData = null;
+  });
+}
+
 /* ---------------- 考核成绩 ---------------- */
 async function loadMyScores() {
   const wrap = $("#assess-scores-wrap");
