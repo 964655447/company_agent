@@ -59,7 +59,8 @@ def _identity_context(user) -> str:
 
 
 async def call_dify_agent(user, query: str,
-                          conversation_id: str | None = None) -> tuple[str, bool, str | None]:
+                          conversation_id: str | None = None,
+                          files: list[str] | None = None) -> tuple[str, bool, str | None]:
     """调 Dify 统一智能体（Agent 仅支持 streaming 模式）。
 
     返回 (回答文本, 是否走AI, conversation_id)。
@@ -87,6 +88,13 @@ async def call_dify_agent(user, query: str,
         }
         if conv_id:
             payload["conversation_id"] = conv_id
+        # 文件（阅卷工作流用）：files 为已上传拿到的 upload_file_id 列表
+        if files:
+            payload["files"] = [
+                {"type": "document", "transfer_method": "local_file",
+                 "upload_file_id": fid}
+                for fid in files
+            ]
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(100.0, connect=10.0)) as client:
             async with client.stream(
@@ -135,3 +143,24 @@ async def call_dify_agent(user, query: str,
     except Exception:
         # Dify 不可用（Key 无效 / 服务挂了 / 超时）一律降级
         return "", False, conversation_id
+
+
+def upload_dify_file(content: bytes, filename: str) -> str | None:
+    """把文件上传到 Dify 拿 upload_file_id（供工作流/智能体引用）。
+
+    返回 file_id 字符串；无 Key / 上传失败返回 None（调用方按降级处理）。
+    Dify 文档类文件统一用 multipart 字段名 `file`。
+    """
+    if not DIFY_AGENT_KEY:
+        return None
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(
+                f"{DIFY_BASE_URL.rstrip('/')}/files/upload",
+                headers={"Authorization": f"Bearer {DIFY_AGENT_KEY}"},
+                files={"file": (filename or "upload.bin", content)},
+            )
+            resp.raise_for_status()
+            return resp.json().get("id")
+    except Exception:
+        return None

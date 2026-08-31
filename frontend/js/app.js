@@ -798,7 +798,7 @@ function openChatView() {
   if (ci) ci.focus();
 }
 
-/* ---------------- 悬浮考勤小助手 ---------------- */
+/* ---------------- 悬浮公司 AI 助手（集合统一智能体） ---------------- */
 const floatGreeted = { done: false };
 
 function renderUserCard(user) {
@@ -824,14 +824,15 @@ function floatTogglePanel(show) {
     const user = state.user;
     if (user) {
       $("#float-sub").textContent = `${esc(user.name)} · ${esc(user.department)} · ${esc(user.position)}`;
+      $("#float-emp-id").textContent = esc(user.emp_id ?? "");
     }
     if (!floatGreeted.done) {
       floatGreeted.done = true;
       if (user) {
         appendFloatMsg("bot", renderUserCard(user), true);
-        appendFloatMsg("bot", `你好，${esc(user.name)}！我是考勤小助手，已识别你的身份。点下方快捷问题或直接输入，比如「这个月我考勤多少天」。`);
+        appendFloatMsg("bot", `你好，${esc(user.name)}！我是公司 AI 助手，已识别你的身份。可直接说「生成我的考核报告」「出一份岗位试卷」「阅试卷（需上传）」或自由提问。`);
       } else {
-        appendFloatMsg("bot", "你好！我是考勤小助手，点下方快捷问题或直接输入。");
+        appendFloatMsg("bot", "你好！我是公司 AI 助手，点下方功能或直接输入。");
       }
     }
     $("#float-input").focus();
@@ -858,25 +859,31 @@ function appendFloatTyping() {
   return el;
 }
 
-async function askAttendance(question) {
-  if (!question || !question.trim()) return;
-  appendFloatMsg("user", question.trim());
+/* 统一发送：文字走 /api/chat（统一智能体）；带文件走 /api/chat/file（阅卷） */
+async function askFloat(message, mode = "chat", fileObj = null) {
+  if (!message || !message.trim()) return;
+  if (mode !== "upload") appendFloatMsg("user", message.trim());
   const typing = appendFloatTyping();
-  const sendBtn = $("#float-send");
-  sendBtn.disabled = true;
+  const sendBtn = (mode === "upload") ? $("#float-gradesend") : $("#float-send");
+  if (sendBtn) sendBtn.disabled = true;
   try {
-    const r = await api("/api/attendance/ask", {
-      method: "POST",
-      json: { question: question, conversation_id: state.floatConvId },
-    });
+    let r;
+    if (mode === "upload" && fileObj) {
+      const fd = new FormData();
+      fd.append("message", message);
+      fd.append("file", fileObj);
+      r = await api("/api/chat/file", { method: "POST", body: fd });
+    } else {
+      r = await api("/api/chat", { method: "POST",
+        json: { message, conversation_id: state.floatConvId } });
+    }
     if (r.conversation_id) state.floatConvId = r.conversation_id;
-    typing.innerHTML = renderText(r.answer);
+    typing.innerHTML = renderText(r.reply);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
   } finally {
-    sendBtn.disabled = false;
-    const log = $("#float-log");
-    log.scrollTop = log.scrollHeight;
+    if (sendBtn) sendBtn.disabled = false;
+    $("#float-log").scrollTop = $("#float-log").scrollHeight;
   }
 }
 
@@ -886,14 +893,38 @@ $("#float-bubble").addEventListener("keydown", (e) => {
 });
 $("#float-close").addEventListener("click", () => floatTogglePanel(false));
 $("#float-quick").addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-q]");
-  if (btn) askAttendance(btn.dataset.q);
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const mode = btn.dataset.mode || "chat";
+  if (mode === "upload") {              // 展开/收起阅卷上传区
+    $("#float-upload").classList.toggle("hidden");
+    return;
+  }
+  let q = btn.dataset.q || "";
+  q = q.replace("{emp_id}", state.user?.emp_id ?? "")
+       .replace("{position}", state.user?.position ?? "");
+  if (q) askFloat(q, "chat");
 });
 $("#float-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const v = $("#float-input").value;
+  const v = $("#float-input").value.trim();
   $("#float-input").value = "";
-  askAttendance(v);
+  if (v) askFloat(v, "chat");
+});
+/* 阅卷上传 */
+const floatFileInput = $("#float-file");
+floatFileInput.addEventListener("change", () => {
+  const f = floatFileInput.files[0];
+  $("#float-file-name").textContent = f ? f.name : "未选择文件";
+});
+$("#float-gradesend").addEventListener("click", () => {
+  const f = floatFileInput.files[0];
+  if (!f) { appendFloatMsg("bot", "请先选择要批改的试卷文件（Word 文档）"); return; }
+  const empId = state.user?.emp_id ?? "";
+  askFloat(`请批改这份试卷（工号 ${empId}）`, "upload", f);
+  floatFileInput.value = "";
+  $("#float-file-name").textContent = "未选择文件";
+  $("#float-upload").classList.add("hidden");
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !$("#float-panel").classList.contains("hidden")) floatTogglePanel(false);
