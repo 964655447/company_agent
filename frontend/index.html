@@ -158,32 +158,12 @@
     <!-- 进阶考核 -->
     <section id="view-assess" class="view">
       <h2 class="view-title">进阶考核 · 岗位知识</h2>
-      <div class="card">
-        <div class="card-head"><h3>查询岗位</h3></div>
-        <form id="assess-form" class="assess-form">
-          <select id="assess-position">
-            <option value="">— 选择或输入岗位 —</option>
-            <option>总经理</option><option>商务总监</option><option>营销经理</option>
-            <option>营销专员</option><option>运营总监</option><option>调度经理</option>
-            <option>调度专员</option><option>运营经理</option><option>运营专员</option>
-            <option>客服经理</option><option>客服专员</option><option>总车队长</option>
-            <option>车队长</option><option>车队文员</option><option>财务总监</option>
-            <option>会计</option><option>出纳</option><option>审核</option>
-          </select>
-          <button type="submit" class="btn-primary">查询岗位</button>
-        </form>
-        <div class="form-tip">岗位介绍与能力要求来自系统知识库，助力转岗与升职规划。</div>
-      </div>
-      <div id="assess-result"></div>
-
-      <!-- 考核申请 -->
-      <div class="card">
-        <div class="card-head"><h3>考核申请</h3></div>
-        <div id="quiz-apply" class="quiz-apply">
-          <p class="form-tip">选择目标岗位，开始岗位能力考核测试（共10题，满分100分）。</p>
-          <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
-            <select id="quiz-position" style="flex:1">
-              <option value="">— 选择考核目标岗位 —</option>
+      <div class="cols-2">
+        <div class="card">
+          <div class="card-head"><h3>查询岗位</h3></div>
+          <form id="assess-form" class="assess-form">
+            <select id="assess-position">
+              <option value="">— 选择或输入岗位 —</option>
               <option>总经理</option><option>商务总监</option><option>营销经理</option>
               <option>营销专员</option><option>运营总监</option><option>调度经理</option>
               <option>调度专员</option><option>运营经理</option><option>运营专员</option>
@@ -191,12 +171,35 @@
               <option>车队长</option><option>车队文员</option><option>财务总监</option>
               <option>会计</option><option>出纳</option><option>审核</option>
             </select>
-            <button class="btn-primary" id="btn-start-quiz">开始考核</button>
-          </div>
+            <button type="submit" class="btn-primary">查询岗位</button>
+          </form>
+          <div class="form-tip">岗位介绍与能力要求来自系统知识库，助力转岗与升职规划。</div>
         </div>
-        <div id="quiz-container" class="quiz-container hidden"></div>
-        <div id="quiz-result" class="quiz-result hidden"></div>
+
+        <!-- 考核申请 -->
+        <div class="card">
+          <div class="card-head"><h3>考核申请</h3></div>
+          <div id="quiz-apply" class="quiz-apply">
+            <p class="form-tip">选择目标岗位，开始岗位能力考核测试（共10题，满分100分）。</p>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+              <select id="quiz-position" style="flex:1">
+                <option value="">— 选择考核目标岗位 —</option>
+                <option>总经理</option><option>商务总监</option><option>营销经理</option>
+                <option>营销专员</option><option>运营总监</option><option>调度经理</option>
+                <option>调度专员</option><option>运营经理</option><option>运营专员</option>
+                <option>客服经理</option><option>客服专员</option><option>总车队长</option>
+                <option>车队长</option><option>车队文员</option><option>财务总监</option>
+                <option>会计</option><option>出纳</option><option>审核</option>
+              </select>
+              <button class="btn-primary" id="btn-start-quiz">开始考核</button>
+            </div>
+          </div>
+          <div id="quiz-container" class="quiz-container hidden"></div>
+          <div id="quiz-result" class="quiz-result hidden"></div>
+        </div>
       </div>
+      <div id="assess-result"></div>
+
 
       <div class="card">
         <div class="card-head">
@@ -220,14 +223,21 @@
           <span class="chat-ico">💬</span>
           <div>
             <div class="chat-title">智能助手</div>
-            <div class="chat-sub" id="chat-sub">已接入统一智能体，可问考勤 / 报销 / 工资 / 考核，会记住我们的对话</div>
+            <div class="chat-sub" id="chat-sub">结合你的考勤 / 报销 / 工资 / 考核数据，随时问我</div>
           </div>
         </div>
-        <div class="chat-log" id="chat-log" aria-live="polite"></div>
-        <div class="chat-quick" id="chat-quick">
-          <button data-q="这个月我的考勤情况怎么样？">本月考勤</button>
-          <button data-q="帮我查一下我上个月的迟到情况">上月迟到</button>
-          <button data-q="我的报销进度怎么样了">报销进度</button>
+        <div class="chat-log" id="chat-log" aria-live="polite">
+          <div class="chat-welcome" id="chat-welcome">
+            <div class="chat-welcome-ico">🤖</div>
+            <h3>你好，我是公司 AI 助手</h3>
+            <p>我可以结合你的身份与数据，回答考勤、报销、工资、考核等问题。<br>试试下面的问题，或在下方直接输入：</p>
+            <div class="chat-welcome-chips">
+              <button data-q="这个月我的考勤情况怎么样？">📅 本月考勤</button>
+              <button data-q="帮我查一下我上个月的迟到情况">⏰ 上月迟到</button>
+              <button data-q="我的报销进度怎么样了">💰 报销进度</button>
+              <button data-q="我的工资条是怎么算出来的">📊 工资核算</button>
+            </div>
+          </div>
         </div>
         <form id="chat-form" class="chat-input-row">
           <input id="chat-input" placeholder="问问智能助手，例如：这个月我迟到几次？" autocomplete="off">

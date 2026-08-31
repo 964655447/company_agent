@@ -1172,8 +1172,6 @@ $("#roster-table").addEventListener("click", async (e) => {
 })();
 
 /* ---------------- 智能助手（统一对话，走后端 /api/chat） ---------------- */
-const chatGreeted = { done: false };
-
 function appendChatMsg(role, html) {
   const log = $("#chat-log");
   const el = document.createElement("div");
@@ -1181,6 +1179,7 @@ function appendChatMsg(role, html) {
   el.innerHTML = html;
   log.appendChild(el);
   log.scrollTop = log.scrollHeight;
+  syncChatWelcome();
   return el;
 }
 function appendChatTyping() {
@@ -1215,7 +1214,7 @@ async function sendChat(message) {
   }
 }
 
-$("#chat-quick").addEventListener("click", (e) => {
+$("#chat-welcome").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-q]");
   if (btn) sendChat(btn.dataset.q);
 });
@@ -1227,14 +1226,15 @@ $("#chat-form").addEventListener("submit", (e) => {
 });
 
 function openChatView() {
-  if (!chatGreeted.done) {
-    chatGreeted.done = true;
-    const who = state.user ? state.user.name : "";
-    appendChatMsg("bot",
-      `你好${who ? "，" + esc(who) : ""}！我是公司智能助手，已知道你的身份与权限。<br>可以直接问我：考勤、报销、工资、考核相关问题，对话会一直记住上下文。`);
-  }
   const ci = $("#chat-input");
   if (ci) ci.focus();
+  syncChatWelcome();
+}
+function syncChatWelcome() {
+  const log = $("#chat-log");
+  const wel = $("#chat-welcome");
+  if (!log || !wel) return;
+  wel.classList.toggle("hidden", !!log.querySelector(".chat-msg"));
 }
 
 /* ---------------- 悬浮公司 AI 助手（集合统一智能体） ---------------- */
