@@ -92,6 +92,19 @@ function closeModal(val) {
   if (_modalResolve) { _modalResolve(val); _modalResolve = null; }
 }
 
+/* ---------------- 材料信息预览（表格内摘要） ---------------- */
+function matPreview(raw) {
+  if (!raw) return '<span class="muted">—</span>';
+  let obj;
+  try { obj = JSON.parse(raw); } catch (e) { return esc(raw.length > 20 ? raw.slice(0, 20) + "…" : raw); }
+  const parts = [];
+  if (obj.category) parts.push(`<span class="tag tag-purple mat-tag-sm">${esc(obj.category)}</span>`);
+  if (obj.amount != null) parts.push(`<span class="mat-preview-amt">¥${Number(obj.amount).toLocaleString("zh-CN")}</span>`);
+  if (obj.files && Array.isArray(obj.files) && obj.files.length) parts.push(`📎${obj.files.length}`);
+  if (!parts.length) return '<span class="muted">有材料</span>';
+  return `<span class="mat-preview-inline">${parts.join(" ")}</span>`;
+}
+
 /* ---------------- 材料信息查看弹窗 ---------------- */
 function openMaterialModal(record) {
   const raw = record?.ocr_raw || "";
@@ -443,14 +456,13 @@ async function loadMyReimb() {
   const tbody = rows.length ? rows.map((r) => {
     const [txt, cls] = REIMB_STATUS[r.status] || [r.status, "tag-gray"];
     const raw = r.ocr_raw || "";
-    const preview = raw ? esc(raw.length > 24 ? raw.slice(0, 24) + "…" : raw) : '<span class="muted">—</span>';
     return `<tr><td>#${r.id}</td><td>${esc(r.category || "未填")}</td>
       <td style="text-align:right">${money(r.amount)}</td>
       <td><span class="tag ${cls}">${txt}</span></td>
       <td>${fmtDT(r.submit_time)}</td>
       <td><button class="link-btn" data-mat="${r.id}" title="点击查看完整材料信息">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span class="mat-preview">${preview}</span>
+        ${matPreview(raw)}
       </button></td></tr>`;
   }).join("") : '<tr class="empty"><td colspan="6">暂无报销记录</td></tr>';
   $("#reimb-table").innerHTML = `<thead><tr><th>单号</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th><th>材料信息</th></tr></thead><tbody>${tbody}</tbody>`;
@@ -720,7 +732,6 @@ async function loadAdminReimb() {
     const tbody = (r.rows || []).length ? r.rows.map((row) => {
       const [txt, cls] = REIMB_STATUS[row.status] || [row.status, "tag-gray"];
       const raw = row.ocr_raw || "";
-      const preview = raw ? esc(raw.length > 24 ? raw.slice(0, 24) + "…" : raw) : '<span class="muted">—</span>';
       const act = ["submitted", "approving"].includes(row.status)
         ? `<div class="review-actions">
              <button class="btn-ok" data-review="${row.id}" data-action="approve">通过</button>
@@ -731,7 +742,7 @@ async function loadAdminReimb() {
         <td><span class="tag ${cls}">${txt}</span></td><td>${fmtDT(row.submit_time)}</td>
         <td><button class="link-btn" data-mat="${row.id}" title="点击查看完整材料信息">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-          <span class="mat-preview">${preview}</span>
+          ${matPreview(raw)}
         </button></td>
         <td>${act}</td></tr>`;
     }).join("") : '<tr class="empty"><td colspan="8">暂无数据</td></tr>';
