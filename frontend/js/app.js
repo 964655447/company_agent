@@ -1663,7 +1663,7 @@ bubble.addEventListener("pointerdown", (e) => {
   stopWalk();                     // 走动中再次按下 → 先停下
   if (_physRAF) stopPhysics();     // 物理下落中再次按下 → 先定格再拖
   wakePet();
-  _drag.on = true; _drag.grabbing = true; _drag.moved = false;
+  _drag.on = true; _drag.grabbing = true; _drag.moved = false; _drag.justClicked = false;
   _drag.pid = e.pointerId;       // 记录 pointerId，仅拖动开始时才 setPointerCapture（避免纯点击吞掉 pointerup）
   _drag.sx = e.clientX; _drag.sy = e.clientY;
   _drag.vx = 0; _drag.vy = 0;
@@ -1711,7 +1711,10 @@ function finishDrag(e) {
   } else {
     _drag.on = false;
     savePetPos();
-    /* 未拖动：由 bubble 的 click 事件负责弹出对话框（更可靠，避免首次 pointerup 丢失导致点不开） */
+    /* 纯点击：直接在 pointerup 处理（pointerup 释放时必定触发，比 click 事件可靠，避免首次点不开），
+       并标记 justClicked，抑制后面可能追发的 click 事件重复切换面板 */
+    _drag.justClicked = true;
+    floatTogglePanel();
   }
 }
 document.addEventListener("pointerup", finishDrag);
@@ -1720,8 +1723,9 @@ document.addEventListener("pointercancel", finishDrag); /* 指针在窗口外释
 /* 单击打开/收起对话框：用标准 click 事件触发，最可靠且不受 pointer 捕获/动作态影响；
    拖动(_drag.moved)时不触发，交给 finishDrag 做抛掷物理 */
 bubble.addEventListener("click", () => {
+  if (_drag.justClicked) { _drag.justClicked = false; return; }  // pointerup 已处理本次点击，避免重复切换
   if (_drag.moved) return;   // 拖动过 → 不是点击，忽略
-  floatTogglePanel();        // 未拖动 = 点击 → 弹出/收起对话
+  floatTogglePanel();        // 兜底：极少数情况下 pointerup 未触发时由 click 打开
 });
 bubble.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); floatTogglePanel(); }
