@@ -42,51 +42,6 @@ async function api(path, opts = {}) {
   return data;
 }
 
-/* SSE 流式 POST：用于 /api/chat 与 /api/chat/file 的逐字输出。
-   onDelta(text) 每收到一段增量文本触发；onMeta({conversation_id, ai}) 收到元信息时触发。
-   body 可为普通对象（转 JSON）或 FormData（带文件，自动带 boundary）。 */
-async function streamPost(path, body, onDelta, onMeta) {
-  const headers = {};
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const opts = { method: "POST", headers };
-  if (body instanceof FormData) {
-    opts.body = body;                 // 不要手动设 Content-Type，浏览器自动加 boundary
-  } else {
-    headers["Content-Type"] = "application/json";
-    opts.body = JSON.stringify(body);
-  }
-  const res = await fetch(API + path, opts);
-  if (!res.ok) {
-    let msg = `请求失败（${res.status}）`;
-    try { const d = await res.json(); if (d.detail) msg = d.detail; } catch (e) {}
-    if (res.status === 401) logout(true);
-    throw new Error(msg);
-  }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let idx;
-    while ((idx = buf.indexOf("\n\n")) !== -1) {   // SSE 事件以空行分隔
-      const raw = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      let event = "message", dataLines = [];
-      raw.split("\n").forEach((line) => {
-        if (line.startsWith("event:")) event = line.slice(6).trim();
-        else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-      });
-      const data = dataLines.join("\n");
-      if (event === "delta") onDelta(data);
-      else if (event === "meta") { try { onMeta(JSON.parse(data)); } catch (e) {} }
-      else if (event === "done") { try { const m = JSON.parse(data); if (m && m.conversation_id) onMeta(m); } catch (e) {} }
-    }
-  }
-}
-
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -1423,26 +1378,23 @@ async function sendChat(message, fileObj = null) {
   const btn = $("#chat-send");
   btn.disabled = true;
   setPetAction("eating");
-  let acc = "";                                    // 已接收的增量文本
-  const onDelta = (t) => {
-    acc += t;
-    typing.innerHTML = renderText(acc);            // 逐字渲染到同一气泡
-    const log = $("#chat-log");
-    log.scrollTop = log.scrollHeight;
-  };
-  const onMeta = (m) => { if (m.conversation_id) state.chatConvId = m.conversation_id; };
   try {
+    let r;
     if (fileObj) {
       const fd = new FormData();
       if (message && message.trim()) fd.append("message", message.trim());
       if (state.chatConvId) fd.append("conversation_id", state.chatConvId);
       fd.append("file", fileObj);
-      await streamPost("/api/chat/file", fd, onDelta, onMeta);
+      r = await api("/api/chat/file", { method: "POST", body: fd });
     } else {
-      await streamPost("/api/chat", { message, conversation_id: state.chatConvId }, onDelta, onMeta);
+      r = await api("/api/chat", {
+        method: "POST",
+        json: { message: message, conversation_id: state.chatConvId },
+      });
     }
-    if (!acc) typing.innerHTML = renderText("智能体未返回内容");
-    if (acc) setPetAction("talk");
+    if (r.conversation_id) state.chatConvId = r.conversation_id;
+    typing.innerHTML = renderText(r.reply);
+    setPetAction("talk");
     setTimeout(() => { if (_petAction === "talk") setPetAction("idle"); }, 3200);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
@@ -1570,7 +1522,7 @@ function appendFloatTyping() {
   return el;
 }
 
-/* 统一发送：文字走 /api/chat（统一智能体）；带文件走 /api/chat/file（均为 SSE 流式） */
+/* 统一发送：文字走 /api/chat（统一智能体）；带文件走 /api/chat/file */
 async function askFloat(message, fileObj = null) {
   if (!message || !message.trim() && !fileObj) return;
   if (!fileObj) appendFloatMsg("user", message.trim());
@@ -1578,25 +1530,20 @@ async function askFloat(message, fileObj = null) {
   const typing = appendFloatTyping();
   $("#float-send").disabled = true;
   setPetAction("eating");   /* 等待回复：吃饭动作 */
-  let acc = "";
-  const onDelta = (t) => {
-    acc += t;
-    typing.innerHTML = renderText(acc);
-    $("#float-log").scrollTop = $("#float-log").scrollHeight;
-  };
-  const onMeta = (m) => { if (m.conversation_id) state.floatConvId = m.conversation_id; };
   try {
+    let r;
     if (fileObj) {
       const fd = new FormData();
       if (message && message.trim()) fd.append("message", message.trim());
-      if (state.floatConvId) fd.append("conversation_id", state.floatConvId);
       fd.append("file", fileObj);
-      await streamPost("/api/chat/file", fd, onDelta, onMeta);
+      r = await api("/api/chat/file", { method: "POST", body: fd });
     } else {
-      await streamPost("/api/chat", { message, conversation_id: state.floatConvId }, onDelta, onMeta);
+      r = await api("/api/chat", { method: "POST",
+        json: { message, conversation_id: state.floatConvId } });
     }
-    if (!acc) typing.innerHTML = renderText("智能体未返回内容");
-    if (acc) setPetAction("talk");
+    if (r.conversation_id) state.floatConvId = r.conversation_id;
+    typing.innerHTML = renderText(r.reply);
+    setPetAction("talk");
     setTimeout(() => { if (_petAction === "talk") setPetAction("idle"); }, 3200);
   } catch (err) {
     typing.innerHTML = "出错了：" + esc(err.message);
