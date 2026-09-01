@@ -774,7 +774,7 @@ async function loadMyScores() {
       ${statCard("最高分", max.toFixed(1), "分")}
       ${statCard("合格次数", `${pass}/${list.length}`)}
     </div>`;
-    const cards = list.map((s) => {
+    const cardRender = (s) => {
       const b = scoreBand(s.score);
       const pct = b.pct;
       return `<div class="score-card">
@@ -788,8 +788,18 @@ async function loadMyScores() {
         </div>
         <div class="score-bar${b.cls === "tag-danger" ? " is-low" : ""}"><span style="width:${pct}%"></span></div>
       </div>`;
-    }).join("");
-    wrap.innerHTML = `${overview}<div class="score-cards">${cards}</div>`;
+    };
+    const ps = _pgState("my-scores");
+    ps.rows = list;
+    ps.render = cardRender;
+    ps.mode = "cards";
+    ps.wrapSel = "#assess-scores-wrap";
+    ps.pagerSel = "#my-scores-pager";
+    ps.overview = overview;
+    ps.emptyText = "暂无考核成绩记录";
+    ps.page = 1;
+    if (!ps.size) ps.size = 10;
+    _drawPagedTable("my-scores");
   } catch (err) {
     wrap.innerHTML = `<p style="color:var(--danger)">${esc(err.message)}</p>`;
   }
@@ -952,7 +962,7 @@ $("#admin-att-pager").addEventListener("change", (e) => {
 /* state._pg[key] = { page, size, rows, render(row), head, tableSel, pagerSel, colspan, emptyText } */
 function _pgState(key) {
   if (!state._pg) state._pg = {};
-  if (!state._pg[key]) state._pg[key] = { page: 1, size: 10, rows: [], render: null, head: "", tableSel: "", pagerSel: "", colspan: 1, emptyText: "暂无数据" };
+  if (!state._pg[key]) state._pg[key] = { page: 1, size: 10, rows: [], render: null, head: "", tableSel: "", pagerSel: "", colspan: 1, emptyText: "暂无数据", mode: "table", wrapSel: "", overview: "" };
   return state._pg[key];
 }
 
@@ -977,28 +987,41 @@ function _drawPagedTable(key) {
   if (ps.page > totalPages) ps.page = totalPages;
   const start = (ps.page - 1) * ps.size;
   const pageRows = ps.rows.slice(start, start + ps.size);
+  const cur = ps.page;
+  const from = start + 1, to = Math.min(start + ps.size, total);
+  // 通用分页器 HTML（表格与卡片模式共用）
+  const pagerHTML = (() => {
+    let h = `<button class="pg-btn" data-pg="prev" data-key="${key}" ${cur === 1 ? "disabled" : ""}>‹ 上一页</button>`;
+    for (const p of _pageWindow(cur, totalPages)) {
+      if (p === "…") h += `<span class="pg-ellipsis">…</span>`;
+      else h += `<button class="pg-btn ${p === cur ? "active" : ""}" data-pg="${p}" data-key="${key}">${p}</button>`;
+    }
+    h += `<button class="pg-btn" data-pg="next" data-key="${key}" ${cur === totalPages ? "disabled" : ""}>下一页 ›</button>`;
+    h += `<span class="pg-info">第 ${from}-${to} 条 / 共 ${total} 条</span>`;
+    h += `<select class="pg-size" data-key="${key}">
+      <option value="10" ${ps.size === 10 ? "selected" : ""}>10/页</option>
+      <option value="20" ${ps.size === 20 ? "selected" : ""}>20/页</option>
+      <option value="50" ${ps.size === 50 ? "selected" : ""}>50/页</option>
+      <option value="100" ${ps.size === 100 ? "selected" : ""}>100/页</option></select>`;
+    return h;
+  })();
+  if (ps.mode === "cards") {
+    const cards = pageRows.length ? pageRows.map(ps.render).join("")
+      : `<p class="form-tip">${emptyHTML(ps.emptyText)}</p>`;
+    const wrap = $(ps.wrapSel);
+    if (wrap) wrap.innerHTML = (ps.overview || "") + `<div class="score-cards">${cards}</div>`;
+    const pager = $(ps.pagerSel);
+    if (!pager) return;
+    pager.innerHTML = total === 0 ? "" : pagerHTML;
+    return;
+  }
   const tbody = pageRows.length ? pageRows.map(ps.render).join("")
     : `<tr class="empty"><td colspan="${ps.colspan}">${emptyHTML(ps.emptyText)}</td></tr>`;
   const tbl = $(ps.tableSel);
   if (tbl) tbl.innerHTML = ps.head + `<tbody>${tbody}</tbody>`;
   const pager = $(ps.pagerSel);
   if (!pager) return;
-  if (total === 0) { pager.innerHTML = ""; return; }
-  const cur = ps.page;
-  const from = start + 1, to = Math.min(start + ps.size, total);
-  let html = `<button class="pg-btn" data-pg="prev" data-key="${key}" ${cur === 1 ? "disabled" : ""}>‹ 上一页</button>`;
-  for (const p of _pageWindow(cur, totalPages)) {
-    if (p === "…") html += `<span class="pg-ellipsis">…</span>`;
-    else html += `<button class="pg-btn ${p === cur ? "active" : ""}" data-pg="${p}" data-key="${key}">${p}</button>`;
-  }
-  html += `<button class="pg-btn" data-pg="next" data-key="${key}" ${cur === totalPages ? "disabled" : ""}>下一页 ›</button>`;
-  html += `<span class="pg-info">第 ${from}-${to} 条 / 共 ${total} 条</span>`;
-  html += `<select class="pg-size" data-key="${key}">
-    <option value="10" ${ps.size === 10 ? "selected" : ""}>10/页</option>
-    <option value="20" ${ps.size === 20 ? "selected" : ""}>20/页</option>
-    <option value="50" ${ps.size === 50 ? "selected" : ""}>50/页</option>
-    <option value="100" ${ps.size === 100 ? "selected" : ""}>100/页</option></select>`;
-  pager.innerHTML = html;
+  pager.innerHTML = total === 0 ? "" : pagerHTML;
 }
 
 /* 全局事件委托：处理带 data-key 的分页控件（admin-att 旧控件无 data-key，不受影响） */
