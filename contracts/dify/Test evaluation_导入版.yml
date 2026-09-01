@@ -605,7 +605,7 @@ workflow:
         paramSchemas:
         - auto_generate: null
           default: mysql
-          form: llm
+          form: constant
           human_description:
             en_US: Used for selecting the database type, mysql, oracle, oracle11g,
               postgresql or mssql.
@@ -668,8 +668,8 @@ workflow:
           template: null
           type: select
         - auto_generate: null
-          default: localhost
-          form: llm
+          default: host.docker.internal
+          form: constant
           human_description:
             en_US: Database hostname or IP address (Original string, not URL-encoded
               string).
@@ -697,8 +697,8 @@ workflow:
           template: null
           type: string
         - auto_generate: null
-          default: null
-          form: llm
+          default: 3306
+          form: constant
           human_description:
             en_US: Database port.
             ja_JP: Database port.
@@ -723,8 +723,8 @@ workflow:
           template: null
           type: number
         - auto_generate: null
-          default: null
-          form: llm
+          default: root
+          form: constant
           human_description:
             en_US: Database username (Original string, not URL-encoded string).
             ja_JP: Database username (Original string, not URL-encoded string).
@@ -749,8 +749,8 @@ workflow:
           template: null
           type: string
         - auto_generate: null
-          default: null
-          form: llm
+          default: 964655
+          form: constant
           human_description:
             en_US: Database password (Original string, not URL-encoded string).
             ja_JP: Database password (Original string, not URL-encoded string).
@@ -775,8 +775,8 @@ workflow:
           template: null
           type: secret-input
         - auto_generate: null
-          default: null
-          form: llm
+          default: company_agent
+          form: constant
           human_description:
             en_US: Database name (Original string, not URL-encoded string).
             ja_JP: Database name (Original string, not URL-encoded string).
@@ -801,8 +801,8 @@ workflow:
           template: null
           type: string
         - auto_generate: null
-          default: null
-          form: llm
+          default: 
+          form: constant
           human_description:
             en_US: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
             ja_JP: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
