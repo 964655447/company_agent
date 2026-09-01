@@ -58,22 +58,21 @@ def _identity_context(user) -> str:
     )
 
 
-async def call_dify_agent(user, query: str,
-                          conversation_id: str | None = None,
-                          files: list[str] | None = None) -> tuple[str, bool, str | None]:
-    """调 Dify 统一智能体（Agent 仅支持 streaming 模式）。
+async def stream_dify_agent(user, query: str,
+                             conversation_id: str | None = None,
+                             files: list[str] | None = None):
+    """流式版：逐增量 yield {"text": 增量文本, "conv_id": 会话id, "ai": 是否走AI}。
 
-    返回 (回答文本, 是否走AI, conversation_id)。
-
-    - conversation_id 用于跨轮次保持会话上下文（让智能体"记得住"历史与身份）。
-      首次调用不传，Dify 在流式响应里返回新会话 id；调用方需保存它，
-      并在后续调用时原样回传，会话才能延续。
-    - 无 Key 或任意异常时返回 ("", False, conversation_id)，由调用方降级兜底。
+    调用方（/api/chat 等）可把每个 delta 直接转发给前端做逐字渲染。
+    - 无 Key 或任意异常时 yield 一次 {"ai": False} 即结束，由调用方降级兜底。
+    - Dify Agent 流式响应里 answer 可能既发增量又发全量（全量 chunk 会把前面
+      内容整段重发），这里负责去重，只 yield 真正新增的那段文本。
     """
     if not DIFY_AGENT_KEY:
-        return "", False, conversation_id
+        yield {"text": "", "conv_id": conversation_id, "ai": False}
+        return
+    conv_id = conversation_id
     try:
-        conv_id = conversation_id
         # 把身份信息直接拼进 query，避免依赖 Dify 的变量替换机制
         enriched_query = _identity_context(user) + (query or "")
         payload = {
@@ -107,7 +106,7 @@ async def call_dify_agent(user, query: str,
                 json=payload,
             ) as resp:
                 resp.raise_for_status()
-                parts = []
+                parts = []  # 已累加文本，用于增量去重
                 async for line in resp.aiter_lines():
                     if not line.startswith("data: "):
                         continue
@@ -118,31 +117,52 @@ async def call_dify_agent(user, query: str,
                         chunk = json.loads(data)
                     except (json.JSONDecodeError, ValueError):
                         continue
-                    # 抓取会话 id（message 事件里携带），用于续会话
                     cid = chunk.get("conversation_id")
                     if cid:
                         conv_id = cid
                     content = chunk.get("answer") or ""
                     if not content:
                         continue
-                    # Dify Agent 流式响应里 answer 可能既发增量又发全量
-                    # （全量 chunk 会把前面内容整段重发），需去重避免重复。
+                    # 去重：保留真正新增的那段
                     prev = "".join(parts)
                     if prev and content.startswith(prev):
-                        parts = [content]          # 全量覆盖
+                        new_text = content[len(prev):] if len(content) > len(prev) else ""
+                        parts = [content]
                     elif prev:
                         ov = 0
                         for i in range(1, min(len(prev), len(content)) + 1):
                             if prev.endswith(content[:i]):
                                 ov = i
-                        parts.append(content[ov:])  # 增量/重叠：截掉重复前缀
+                        new_text = content[ov:]
+                        parts.append(content[ov:])
                     else:
+                        new_text = content
                         parts.append(content)
-        answer = "".join(parts).strip()
-        return (answer or "智能体未返回内容", True, conv_id)
+                    if new_text:
+                        yield {"text": new_text, "conv_id": conv_id, "ai": True}
     except Exception:
         # Dify 不可用（Key 无效 / 服务挂了 / 超时）一律降级
-        return "", False, conversation_id
+        yield {"text": "", "conv_id": conversation_id, "ai": False}
+
+
+async def call_dify_agent(user, query: str,
+                          conversation_id: str | None = None,
+                          files: list[str] | None = None) -> tuple[str, bool, str | None]:
+    """兼容旧调用（考勤等）：聚合流式结果为完整字符串后返回。
+
+    返回 (回答文本, 是否走AI, conversation_id)。无 Key / 异常时返回
+    ("", False, conversation_id)，由调用方降级兜底。
+    """
+    acc, ai, conv_id = "", False, conversation_id
+    async for ev in stream_dify_agent(user, query, conversation_id, files):
+        if ev["ai"]:
+            ai = True
+            acc += ev["text"]
+        if ev["conv_id"]:
+            conv_id = ev["conv_id"]
+    if ai:
+        return (acc.strip() or "智能体未返回内容", True, conv_id)
+    return "", False, conv_id
 
 
 def upload_dify_file(content: bytes, filename: str) -> str | None:
