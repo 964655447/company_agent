@@ -550,7 +550,15 @@ $("#assess-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const pos = $("#assess-position").value.trim();
   if (!pos) return;
-  $("#assess-result").innerHTML = `<div class="card assess-card"><p>查询中…</p></div>`;
+  // 在查询岗位卡片内（form下方）显示结果
+  const $card = $("#assess-form").closest(".card");
+  let $result = $card.querySelector(".assess-inline-result");
+  if (!$result) {
+    $result = document.createElement("div");
+    $result.className = "assess-inline-result";
+    $card.appendChild($result);
+  }
+  $result.innerHTML = `<p style="color:var(--ink-3);padding:8px 0">查询中…</p>`;
   try {
     const r = await api("/api/assessment/query", { method: "POST", json: { position: pos } });
     const relHtml = `
@@ -562,25 +570,25 @@ $("#assess-form").addEventListener("submit", async (e) => {
         <div class="assess-rel-item"><span class="assess-rel-ico">🎯</span>
           <div>${relMyScore(r.my_score)}</div></div>
       </div>`;
-    $("#assess-result").innerHTML = `
-      <div class="card assess-card">
-        <h4>${esc(pos)}</h4>
-        <p>${esc(r.intro || "暂无介绍")}</p>
-        <div class="assess-sub">核心能力要求</div>
-        <div class="chip-row">${(r.skills || []).map((s) => `<span class="chip">${esc(s)}</span>`).join("") || "<span style='color:var(--ink-3)'>暂无</span>"}</div>
-        <div class="assess-sub">管理能力要求</div>
-        <div class="chip-row">${(r.management_abilities || []).map((s) => `<span class="chip alt">${esc(s)}</span>`).join("") || "<span style='color:var(--ink-3)'>暂无</span>"}</div>
-        <div class="assess-sub">建议发展路径</div>
-        <ol style="padding-left:20px;color:var(--ink-2);font-size:13.5px">${(r.suggested_path || []).map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
-        ${relHtml}
-      </div>`;
+    $result.innerHTML = `
+      <div class="assess-sub" style="margin-top:12px">岗位介绍</div>
+      <p style="font-size:13.5px;color:var(--ink-2);margin-bottom:10px">${esc(r.intro || "暂无介绍")}</p>
+      <div class="assess-sub">核心能力要求</div>
+      <div class="chip-row">${(r.skills || []).map((s) => `<span class="chip">${esc(s)}</span>`).join("") || "<span style='color:var(--ink-3)'>暂无</span>"}</div>
+      <div class="assess-sub">管理能力要求</div>
+      <div class="chip-row">${(r.management_abilities || []).map((s) => `<span class="chip alt">${esc(s)}</span>`).join("") || "<span style='color:var(--ink-3)'>暂无</span>"}</div>
+      <div class="assess-sub">建议发展路径</div>
+      <ol style="padding-left:20px;color:var(--ink-2);font-size:13.5px;margin-bottom:8px">${(r.suggested_path || []).map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+      ${relHtml}`;
   } catch (err) {
-    $("#assess-result").innerHTML = `<div class="card assess-card"><p style="color:var(--danger)">${esc(err.message)}</p></div>`;
+    $result.innerHTML = `<p style="color:var(--danger);padding:8px 0">${esc(err.message)}</p>`;
   }
 });
 
 /* ---------------- 考核申请 / 答题 ---------------- */
-let quizData = null;  // 当前试卷数据（含标准答案，不暴露给前端DOM）
+let quizData = null;   // 当前试卷数据（含标准答案，不暴露给前端DOM）
+let quizPage = 0;      // 当前页码（从0开始）
+const QUIZ_PER_PAGE = 2; // 每页显示题数
 
 $("#btn-start-quiz").addEventListener("click", async () => {
   const pos = $("#quiz-position").value.trim();
@@ -588,7 +596,7 @@ $("#btn-start-quiz").addEventListener("click", async () => {
 
   $("#btn-start-quiz").disabled = true;
   $("#btn-start-quiz").textContent = "出题中…";
-  $("#quiz-container").innerHTML = `<p class="form-tip">正在生成{esc(pos)}岗位考核试题…</p>`;
+  $("#quiz-container").innerHTML = `<p class="form-tip">正在生成${esc(pos)}岗位考核试题…</p>`;
   $("#quiz-container").classList.remove("hidden");
   $("#quiz-result").classList.add("hidden");
 
@@ -596,7 +604,8 @@ $("#btn-start-quiz").addEventListener("click", async () => {
     const r = await api("/api/assessment/generate", { method: "POST", json: { target_position: pos } });
     if (r.error) { throw new Error(r.error); }
     quizData = r;
-    renderQuiz(r);
+    quizPage = 0;
+    renderQuizPage();
   } catch (err) {
     $("#quiz-container").innerHTML = `<p style="color:var(--danger)">出题失败：${esc(err.message)}</p>`;
   } finally {
@@ -605,21 +614,26 @@ $("#btn-start-quiz").addEventListener("click", async () => {
   }
 });
 
-function renderQuiz(data) {
-  const qs = data.questions || [];
+function renderQuizPage() {
+  const qs = quizData.questions || [];
+  const totalPages = Math.ceil(qs.length / QUIZ_PER_PAGE);
+  const startIdx = quizPage * QUIZ_PER_PAGE;
+  const pageQs = qs.slice(startIdx, startIdx + QUIZ_PER_PAGE);
+
   let html = `
     <div class="quiz-header">
-      <span><strong>${esc(data.target_position)}</strong> 岗位考核</span>
-      <span class="quiz-progress">共 ${qs} 题 · 满分 ${data.max_score} 分</span>
+      <span><strong>${esc(quizData.target_position)}</strong> 岗位考核</span>
+      <span class="quiz-progress">共 ${qs.length} 题 · 满分 ${quizData.max_score} 分 · 第 ${quizPage + 1}/${totalPages} 页</span>
     </div>
     <div class="quiz-body">`;
 
-  qs.forEach((q, i) => {
+  pageQs.forEach((q, i) => {
+    const globalIdx = startIdx + i;
     const typeLabel = q.type === "single" ? "单选题" : q.type === "multi" ? "多选题" : "判断题";
     const ptsLabel = `(${q.points}分)`;
     html += `
       <div class="quiz-q" data-qid="${q.id}" data-type="${q.type}">
-        <div class="quiz-q-head"><span class="quiz-q-num">第${i + 1}题</span>
+        <div class="quiz-q-head"><span class="quiz-q-num">第${globalIdx + 1}题</span>
           <span class="quiz-q-type">${typeLabel}</span><span class="quiz-q-pts">${ptsLabel}</span>
         </div>
         <div class="quiz-q-text">${esc(q.question)}</div>
@@ -636,7 +650,13 @@ function renderQuiz(data) {
     html += `</div></div>`;
   });
 
+  // 分页导航
   html += `
+    </div>
+    <div class="quiz-page-nav">
+      <button class="btn-outline" id="quiz-prev-btn" ${quizPage === 0 ? "disabled" : ""}>上一页</button>
+      <span class="quiz-page-dots">${_pageDots(totalPages)}</span>
+      <button class="btn-primary" id="quiz-next-btn" ${quizPage >= totalPages - 1 ? "disabled" : ""}>下一页</button>
     </div>
     <div class="quiz-foot">
       <button class="btn-primary" id="btn-submit-quiz">提交答卷</button>
@@ -645,8 +665,19 @@ function renderQuiz(data) {
   $("#quiz-container").innerHTML = html;
   $("#quiz-apply").classList.add("hidden");
 
+  // 绑定翻页
+  $("#quiz-prev-btn").addEventListener("click", () => { if (quizPage > 0) { quizPage--; renderQuizPage(); } });
+  $("#quiz-next-btn").addEventListener("click", () => { if (quizPage < totalPages - 1) { quizPage++; renderQuizPage(); } });
   // 绑定提交
   $("#btn-submit-quiz").addEventListener("click", submitQuiz);
+}
+
+function _pageDots(total) {
+  let dots = "";
+  for (let i = 0; i < total; i++) {
+    dots += `<span class="quiz-dot ${i === quizPage ? "active" : ""}" data-p="${i}"></span>`;
+  }
+  return dots;
 }
 
 async function submitQuiz() {

@@ -995,8 +995,19 @@ button { font: inherit; cursor: pointer; border: none; border-radius: 10px; tran
 .quiz-opt input { accent-color: #6355f7; }
 .quiz-opt span { font-size: 14px; user-select: none; }
 .quiz-opt-multi input { width: 17px; height: 17px; }
-.quiz-foot { text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--border); }
+.quiz-foot { text-align: center; margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border); }
 #btn-submit-quiz { padding: 10px 48px; font-size: 15px; }
+
+/* 答题分页导航 */
+.quiz-page-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+.quiz-page-nav button { padding: 6px 20px; font-size: 13px; }
+.quiz-page-nav button[disabled] { opacity: 0.4; cursor: not-allowed; }
+.quiz-page-dots { display: flex; gap: 6px; align-items: center; }
+.quiz-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: all .2s; cursor: pointer; }
+.quiz-dot.active { background: var(--primary); width: 22px; border-radius: 4px; }
+
+/* 岗位查询内联结果 */
+.assess-inline-result { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
 
 /* 成绩单 */
 .quiz-result { padding: 20px 0; }
