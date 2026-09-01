@@ -1,0 +1,814 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: 工资核算并插入数据库
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.2.15@1df8bd27d67c149e6db3c210830ef6e3857c5a9df5e8edbe9e785b995f337ef5
+    version: null
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload: {}
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: start
+        targetType: question-classifier
+      id: 1787974987375-source-1788001558846-target
+      source: '1787974987375'
+      sourceHandle: source
+      target: '1788001558846'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: code
+        targetType: llm
+      id: 1787975093885-source-1787993843247-target
+      source: '1787975093885'
+      sourceHandle: source
+      target: '1787993843247'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: code
+        targetType: question-classifier
+      id: 1787991668440-source-1788001971309-target
+      source: '1787991668440'
+      sourceHandle: source
+      target: '1788001971309'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: llm
+        targetType: end
+      id: 1787993843247-source-1787988719561-target
+      source: '1787993843247'
+      sourceHandle: source
+      target: '1787988719561'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: llm
+        targetType: end
+      id: 1787996667305-source-1788000020496-target
+      source: '1787996667305'
+      sourceHandle: source
+      target: '1788000020496'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: llm
+        targetType: end
+      id: 1787998333396-source-1788000020496-target
+      source: '1787998333396'
+      sourceHandle: source
+      target: '1788000020496'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: question-classifier
+        targetType: code
+      id: 1788001558846-1-1787975093885-target
+      source: '1788001558846'
+      sourceHandle: '1'
+      target: '1787975093885'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: question-classifier
+        targetType: code
+      id: 1788001558846-1788001788020-1787991668440-target
+      source: '1788001558846'
+      sourceHandle: '1788001788020'
+      target: '1787991668440'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: question-classifier
+        targetType: code
+      id: 1788001558846-2-1787991668440-target
+      source: '1788001558846'
+      sourceHandle: '2'
+      target: '1787991668440'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: question-classifier
+        targetType: llm
+      id: 1788001971309-1-1787996667305-target
+      source: '1788001971309'
+      sourceHandle: '1'
+      target: '1787996667305'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: question-classifier
+        targetType: llm
+      id: 1788001971309-2-1787998333396-target
+      source: '1788001971309'
+      sourceHandle: '2'
+      target: '1787998333396'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: 请输入工号查询
+          options: []
+          placeholder: ''
+          required: true
+          type: number
+          variable: job_num
+        - default: ''
+          hint: ''
+          label: 请输入姓名
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: name
+        - default: ''
+          hint: ''
+          label: 查询薪资或生成工资条或生成员工信息报告
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: query
+        - default: ''
+          hint: ''
+          label: 绩效系数
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: performance_rating
+      height: 186
+      id: '1787974987375'
+      position:
+        x: 0
+        y: 126.27142857142857
+      positionAbsolute:
+        x: 0
+        y: 126.27142857142857
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "# Dify 代码节点（查询节点）：传入工号，返回该员工全部个人信息 + 薪资（横向二维表格）\n# 入参：arg1 = 员工工号 employee_id\n\
+          # 输出：{\"result\": \"Markdown 表格字符串\"}，横向（表头是所有字段名，值是一行），\n#       字段名与建表\
+          \ DDL 一致（employee_id），已去掉 NO 字段\nimport pymysql\nfrom decimal import Decimal\n\
+          \n# ===== 连接与表名（按你的环境修改）=====\nDB_HOST = \"host.docker.internal\"\nDB_PORT\
+          \ = 3306\nDB_USER = \"root\"\nDB_PASSWORD = \"root\"\nDB_NAME = \"company_agent\"\
+          \nQUERY_TABLE = \"employee_salary\"   # 查本月新表则改成 new_test\n\n# 需要排除的字段（按需增删），比较时大小写不敏感\n\
+          EXCLUDE_COLS = {\"no\"}\n\n# 规范列名（与建表 DDL 一致）：校正 MySQL 可能返回的小写列名（如 employee_id），\n\
+          # 并作为横向表格的字段顺序。\nCANONICAL_COLS = [\n    \"NO\", \"employee_id\", \"name\"\
+          , \"position\", \"base_salary\",\n    \"performance_rating\", \"performance_bonus\"\
+          , \"allowance\", \"gross_salary\",\n]\nCANON_MAP = {c.lower(): c for c in\
+          \ CANONICAL_COLS}\n\n\ndef _format_value(v):\n    \"\"\"Decimal 转 float，float\
+          \ 统一两位小数；其他类型原样 str。\"\"\"\n    if isinstance(v, Decimal):\n        v =\
+          \ float(v)\n    if isinstance(v, float):\n        v = f\"{v:.2f}\"\n   \
+          \ return str(v)\n\n\ndef main(arg1: str) -> dict:\n    con = pymysql.connect(\n\
+          \        host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD,\n\
+          \        database=DB_NAME, charset=\"utf8mb4\",\n    )\n    try:\n     \
+          \   with con.cursor() as cursor:\n            sql = f\"SELECT * FROM `{QUERY_TABLE}`\
+          \ WHERE `employee_id` = %s\"\n            cursor.execute(sql, (arg1,))\n\
+          \            row = cursor.fetchone()\n            if not row:\n        \
+          \        return {\"result\": \"未找到该员工信息\"}\n            cols = [d[0] for\
+          \ d in cursor.description]   # 数据库返回的原始列名\n            # 1) 计算横向表格的列顺序：按\
+          \ CANONICAL_COLS 声明的顺序，\n            #    只保留数据库实际返回的、且不在 EXCLUDE_COLS 中的列\n\
+          \            display_cols = [\n                CANON_MAP.get(c.lower(),\
+          \ c)\n                for c in CANONICAL_COLS\n                if c.lower()\
+          \ in {x.lower() for x in cols} and c.lower() not in EXCLUDE_COLS\n     \
+          \       ]\n            # 兜底：如果 CANONICAL_COLS 没覆盖的列，追加在末尾（数据库原始顺序）\n   \
+          \         canon_lower = {c.lower() for c in CANONICAL_COLS}\n          \
+          \  for c in cols:\n                if c.lower() not in canon_lower and c.lower()\
+          \ not in EXCLUDE_COLS:\n                    display_cols.append(CANON_MAP.get(c.lower(),\
+          \ c))\n            if not display_cols:\n                return {\"result\"\
+          : \"未找到该员工信息\"}\n            # 2) 拿这条记录对应各列的值（按 display_cols 同顺序）\n    \
+          \        row_map = {c.lower(): v for c, v in zip(cols, row)}\n         \
+          \   data_values = []\n            for dc in display_cols:\n            \
+          \    raw_key = next((c for c in cols if CANON_MAP.get(c.lower(), c) == dc),\
+          \ None)\n                v = row_map.get(raw_key.lower() if raw_key else\
+          \ dc.lower())\n                data_values.append(_format_value(v))\n  \
+          \          # 3) 拼成横向 Markdown 表格\n            header_line = \"| \" + \"\
+          \ | \".join(display_cols) + \" |\"\n            sep_line = \"| \" + \" |\
+          \ \".join(\"---\" for _ in display_cols) + \" |\"\n            data_line\
+          \ = \"| \" + \" | \".join(data_values) + \" |\"\n            table = \"\\\
+          n\".join([header_line, sep_line, data_line])\n            return {\"result\"\
+          : table}\n    finally:\n        con.close()\n"
+        code_language: python3
+        outputs:
+          result:
+            children: null
+            type: string
+        selected: false
+        title: 查询执行
+        type: code
+        variables:
+        - value_selector:
+          - '1787974987375'
+          - job_num
+          value_type: number
+          variable: arg1
+      height: 51
+      id: '1787975093885'
+      position:
+        x: 703
+        y: 8.07142857142857
+      positionAbsolute:
+        x: 703
+        y: 8.07142857142857
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        outputs:
+        - value_selector:
+          - '1787975093885'
+          - result
+          value_type: string
+          variable: result
+        selected: false
+        title: 输出
+        type: end
+      height: 88
+      id: '1787988719561'
+      position:
+        x: 1385
+        y: 14.5
+      positionAbsolute:
+        x: 1385
+        y: 14.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        code: "# Dify 代码节点（来源/目标分表版，一条线兼容\"报告/工资表\"两种场景）\n# 入参：arg1 = 用户查询语句（含员工工号）,\
+          \ performance_rating = 本月绩效系数（可空）\n# 逻辑：\n#   1) 从【上月表 SOURCE_TABLE】读取该员工全部数据\n\
+          #   2) 按 performance_rating 是否为空分两种走法：\n#        - 有值 → 原有数据 + 本月新系数 → 计算奖金/应发，写入【本月新表\
+          \ TARGET_TABLE】\n#        - 空值 → 报告场景：只读上月数据，并去 TARGET_TABLE 反查该员工是否有\"\
+          现成\"本月数据\n#                 （之前通过工资条分支生成过）；有就回传，无就空\n#   3) 输出三个变量（prev/cur\
+          \ 不含 no 列）：\n#        prev_record   = 上月全部信息\n#        cur_record    = 本月信息；有系数=刚重算，无系数但表里有=现成本月，无=空\
+          \ {}\n#        cur_generated = \"true\"/\"false\"，标记本月是否有真实数据供下游判断展示\n#\
+          \ 字段名全部从结果集动态获取，不写死，保证与表结构一致。\nimport re\nimport json\nfrom decimal import\
+          \ Decimal\nimport pymysql\n\n\n# 这三列是\"本月要重算\"的，生成本月记录时由重算结果覆盖\nCOMPUTE_COLS\
+          \ = {\"performance_rating\", \"performance_bonus\", \"gross_salary\"}\n\n\
+          # 输出时排除的列（no 是序号列，不在结果展示里出现，写入数据库时仍保留）\nOUTPUT_EXCLUDE = {\"no\"}\n\n# =====\
+          \ 数据库连接配置（按你的实际环境修改）=====\nDB_HOST = \"host.docker.internal\"\nDB_USER =\
+          \ \"root\"\nDB_PASSWORD = \"root\"\nDB_NAME = \"company_agent\"        \
+          \  # 真正装有 employee_salary / employee_salary_last_month 表的库\n\n# ===== 表名配置\
+          \ =====\nSOURCE_TABLE = \"employee_salary\"   # 上月表（来源，只读）\nTARGET_TABLE\
+          \ = \"employee_salary_last_month\"   # 本月新表（目标，写入）\n\n\ndef main(arg1, performance_rating)\
+          \ -> dict:\n    # 调试上下文：所有未预期错误都会附上入参类型与值，方便定位 \"int is not iterable\" 这类莫名报错\n\
+          \    _dbg = (\n        f\"arg1(type={type(arg1).__name__}, value={arg1!r});\
+          \ \"\n        f\"performance_rating(type={type(performance_rating).__name__},\
+          \ value={performance_rating!r})\"\n    )\n    # 1) 从查询语句中提取员工工号（对应表里的 employee_id\
+          \ 列）\n    emp_id = _extract_emp_id(arg1)\n    if not emp_id:\n        raise\
+          \ ValueError(f\"无法从查询中识别员工工号 | arg1={arg1!r}\")\n\n    # 2) 绩效系数：可空\n  \
+          \  #    - 有值 → 走\"生成工资表\"分支：读+重算+写入 employee_salary_last_month\n    #  \
+          \  - 空值 → 走\"生成报告\"分支：只读上月数据，不写任何表\n    #    这样「写入执行」节点在一条线里对两种场景都安全。\n\
+          \    has_rating = performance_rating is not None and str(performance_rating).strip()\
+          \ != \"\"\n    new_rating = None\n    if has_rating:\n        try:\n   \
+          \         new_rating = float(performance_rating)\n        except (TypeError,\
+          \ ValueError):\n            raise ValueError(f\"绩效系数不合法: {performance_rating!r}\"\
+          )\n\n    conn = pymysql.connect(\n        host=DB_HOST,\n        user=DB_USER,\n\
+          \        password=DB_PASSWORD,\n        database=DB_NAME,\n        charset=\"\
+          utf8mb4\",\n    )\n    try:\n        try:\n            with conn.cursor()\
+          \ as cur:\n                # 3) 从【上月表】读取该员工全部数据，列名由结果集动态获得\n           \
+          \     cur.execute(\n                    f\"SELECT * FROM `{SOURCE_TABLE}`\
+          \ WHERE `employee_id`=%s\",\n                    (emp_id,),\n          \
+          \      )\n                row = cur.fetchone()\n                if not row:\n\
+          \                    raise ValueError(f\"未找到 employee_id={emp_id} 的上月数据（来源表\
+          \ {SOURCE_TABLE}）\")\n                src_cols = [d[0] for d in cur.description]\
+          \       # 上月表实际列名\n                old = dict(zip(src_cols, row))      \
+          \             # 上月全部字段\n\n                # 4) 原有数据不变：只保留\"非计算列\"，绩效三列交给本月重算\n\
+          \                keep = {k: v for k, v in old.items() if k not in COMPUTE_COLS}\n\
+          \n                # 5) 生成本月记录：不变字段 + 本月新绩效系数\n                #    keep\
+          \ 已包含 no 列（来源表有 no 且不在 COMPUTE_COLS），\n                #    new_rec 因此含\
+          \ no，写入目标表时不会触发 \"Field 'no' doesn't have a default value\"。\n         \
+          \       new_rec = dict(keep)\n\n                if has_rating:\n       \
+          \             # 6) 计算绩效奖金与应发合计\n                    #    公式：绩效奖金 = 绩效系数\
+          \ × 10000（封顶 10000）\n                    new_rec[\"performance_rating\"\
+          ] = round(new_rating, 2)\n                    base = float(new_rec[\"base_salary\"\
+          ])\n                    allowance = float(new_rec[\"allowance\"])\n    \
+          \                bonus = min(new_rating * 10000, 10000)\n              \
+          \      new_rec[\"performance_bonus\"] = round(bonus, 2)\n              \
+          \      new_rec[\"gross_salary\"] = round(base + bonus + allowance, 2)\n\n\
+          \                    # 7) 写入【本月新表 employee_salary_last_month】：列名以目标表实际结构为准\n\
+          \                    #    目标表若不存在，按来源表结构自动建（CREATE TABLE ... LIKE）\n   \
+          \                 cur.execute(\n                        f\"CREATE TABLE\
+          \ IF NOT EXISTS `{TARGET_TABLE}` LIKE `{SOURCE_TABLE}`\"\n             \
+          \       )\n                    cur.execute(f\"SELECT * FROM `{TARGET_TABLE}`\
+          \ LIMIT 0\")\n                    tgt_cols = [d[0] for d in cur.description]\
+          \        # 本月新表实际列名\n                    write_cols = [c for c in tgt_cols\
+          \ if c in new_rec]  # 只写两张表都有的列（含 no）\n                    col_sql = \"\
+          , \".join(f\"`{c}`\" for c in write_cols)\n                    placeholders\
+          \ = \", \".join([\"%s\"] * len(write_cols))\n                    vals =\
+          \ [new_rec.get(c) for c in write_cols]\n                    update_sql =\
+          \ \", \".join(f\"`{c}`=VALUES(`{c}`)\" for c in write_cols)\n          \
+          \          cur.execute(\n                        f\"INSERT INTO `{TARGET_TABLE}`\
+          \ ({col_sql}) VALUES ({placeholders}) \"\n                        f\"ON\
+          \ DUPLICATE KEY UPDATE {update_sql}\",\n                        vals,\n\
+          \                    )\n                    conn.commit()\n            \
+          \        existing_cur = None\n                else:\n                  \
+          \  # 报告场景：去 TARGET_TABLE 反查\"现成本月数据\"，\n                    # 这样报告分支也能看到之前写入的数据。\n\
+          \                    # 先判断表是否存在（如果从未生成过工资条，目标表还没建）。\n                  \
+          \  cur.execute(\n                        \"SELECT 1 FROM INFORMATION_SCHEMA.TABLES\
+          \ \"\n                        \"WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s\
+          \ LIMIT 1\",\n                        (DB_NAME, TARGET_TABLE),\n       \
+          \             )\n                    if cur.fetchone() is None:\n      \
+          \                  existing_cur = None        # 表还没建过，本月肯定没数据\n        \
+          \            else:\n                        cur.execute(\n             \
+          \               f\"SELECT * FROM `{TARGET_TABLE}` WHERE `employee_id`=%s\"\
+          ,\n                            (emp_id,),\n                        )\n \
+          \                       existing_row = cur.fetchone()\n                \
+          \        if existing_row is None:\n                            existing_cur\
+          \ = None    # 表有但这个员工没数据\n                        else:\n              \
+          \              cur_cols = [d[0] for d in cur.description]\n            \
+          \                existing_cur = dict(zip(cur_cols, existing_row))\n    \
+          \                        # 排除 no 列（与写入时展示口径一致）\n                       \
+          \     existing_cur = {\n                                k: v for k, v in\
+          \ existing_cur.items()\n                                if k not in OUTPUT_EXCLUDE\n\
+          \                            }\n\n            # 8) Decimal 转 float，避免 Dify\
+          \ 返回结果时 JSON 序列化失败；\n            #    输出都序列化为 JSON 字符串（String 类型）。\n   \
+          \         #    原因：Dify 的 Object 类型输出在下游\"输入变量\"里会传空，String 则稳定可引用。\n   \
+          \         prev_record = {\n                k: float(v) if isinstance(v,\
+          \ Decimal) else v\n                for k, v in old.items() if k not in OUTPUT_EXCLUDE\n\
+          \            }\n            if has_rating:\n                # 有系数 → 本月是重算后的真实数据\n\
+          \                cur_record = {\n                    k: float(v) if isinstance(v,\
+          \ Decimal) else v\n                    for k, v in new_rec.items() if k\
+          \ not in OUTPUT_EXCLUDE\n                }\n                cur_generated\
+          \ = \"true\"\n            elif existing_cur is not None:\n             \
+          \   # 无系数但 TARGET_TABLE 已有本月数据（之前生成过）→ 读出来当 cur_record\n               \
+          \ cur_record = {\n                    k: float(v) if isinstance(v, Decimal)\
+          \ else v\n                    for k, v in existing_cur.items()\n       \
+          \         }\n                cur_generated = \"true\"\n            else:\n\
+          \                # 无系数 + 也没现成本月数据 → 本月确无数据\n                cur_record =\
+          \ {}\n                cur_generated = \"false\"\n            return {\n\
+          \                \"prev_record\": json.dumps(prev_record, ensure_ascii=False,\
+          \ default=str),\n                \"cur_record\": json.dumps(cur_record,\
+          \ ensure_ascii=False, default=str),\n                \"cur_generated\":\
+          \ cur_generated,\n            }\n        except ValueError:\n          \
+          \  # 已知业务校验错误（找不到工号/数据、系数非法）原样抛出\n            raise\n        except Exception\
+          \ as e:\n            # 未知错误：附上入参类型 + 完整堆栈，方便定位 \"int is not iterable\" 这类莫名报错\n\
+          \            import traceback\n            raise RuntimeError(\n       \
+          \         f\"写入执行内部错误 | {_dbg}\\n--- original ---\\n\"\n               \
+          \ f\"{type(e).__name__}: {e}\\n{traceback.format_exc()}\"\n            )\
+          \ from e\n    finally:\n        conn.close()\n\n\ndef _extract_emp_id(query):\n\
+          \    \"\"\"从查询/工号输入中提取员工工号（对应表 employee_id 列）\"\"\"\n    if query is None:\n\
+          \        return None\n    s = str(query)\n    patterns = [\n        r\"\
+          工号[是为：:\\s]*([A-Za-z0-9]+)\",\n        r\"员工[编号是为：:\\s]*([A-Za-z0-9]+)\"\
+          ,\n        r\"employee_id[是为：:\\s]*([A-Za-z0-9]+)\",\n        r\"ID[是为：:\\\
+          s]*([A-Za-z0-9]+)\",\n        r\"\\b([A-Z]\\d{2,})\\b\",   # 字母+数字，如 A001\n\
+          \        r\"\\b(\\d{3,})\\b\",        # 纯数字\n    ]\n    for p in patterns:\n\
+          \        m = re.search(p, s, re.IGNORECASE)\n        if m:\n           \
+          \ return m.group(1)\n    return None\n"
+        code_language: python3
+        outputs:
+          cur_generated:
+            children: null
+            type: string
+          cur_record:
+            children: null
+            type: string
+          prev_record:
+            children: null
+            type: string
+        selected: false
+        title: 写入执行
+        type: code
+        variables:
+        - value_selector:
+          - '1787974987375'
+          - job_num
+          value_type: number
+          variable: arg1
+        - value_selector:
+          - '1787974987375'
+          - performance_rating
+          value_type: string
+          variable: performance_rating
+      height: 51
+      id: '1787991668440'
+      position:
+        x: 703
+        y: 304.9
+      positionAbsolute:
+        x: 703
+        y: 304.9
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: qwen3.7-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: 90d3ae16-85e9-4c10-b59d-df5a9cbf1c3f
+          role: system
+          text: '你是工资条自动生成&数据提取大师。
+
+            你的当前任务：从传入的数据库查询结果、工资文本中，提取员工薪资相关字段，必须输出二维表格形式数据.
+
+
+            需要提取字段如下,并按顺序输出：
+
+            ID:工号
+
+            name:姓名
+
+            position:职位
+
+            base_salary：基本工资，数值类型
+
+            performance_rating：绩效系数，数值类型
+
+            performance_salary：绩效工资，数值类型
+
+            allowance：补贴，数值类型
+
+            gross_salary:合计总薪资
+
+
+
+            执行规则：
+
+            1. 优先参考【数据库SQL查询结果】里面的真实薪资数据，以此为第一数据源；
+
+            2. 如果数据库存在有效数据，如实提取对应数字；
+
+            3. 如果数据库无有效数据，禁止编造数字，禁止强行输出0；
+
+            4. 必须只返回纯净二维表格。
+
+            '
+        - id: b867b673-ae9c-456c-b652-4b616713e247
+          role: user
+          text: '{{#1787975093885.result#}}'
+        selected: false
+        title: 查询工资条
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1787993843247'
+      position:
+        x: 1044
+        y: 0
+      positionAbsolute:
+        x: 1044
+        y: 0
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: qwen3.7-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: 979e9500-14c4-40e3-872d-3c8e77248237
+          role: system
+          text: "你是工资条自动生成&数据提取大师。\n你的当前任务：从传入的数据库查询结果、工资文本中，提取员工薪资相关字段，必须输出二维表格形式数据.\n\
+            【前置判断 - 必须先做】\n读取 {{#1787991668440.cur_generated#}}：\n- 如果 {{#1787991668440.cur_generated#}}\
+            \ = \"false\"（无绩效系数，本月无数据）：\n  直接输出一句话：\n  「本月工资表尚未生成。请先在系统中生成本月工资条（提供本月绩效系数，例如「绩效\
+            \ 0.8」）。」\n  然后结束，不要输出任何工资条表格。\n\n- 如果 {{#1787991668440.cur_generated#}}\
+            \ = \"true\"：再按以下规则输出本月工资条：\n  - 横向表格，列名固定为：工号 | 姓名 | 岗位 | 基本工资 | 绩效系数\
+            \ | 绩效奖金 | 津贴 | 应发合计\n  - 数据来自 cur_record\n  - 只输出一行表头 + 一行数据 + 一段简短说明\n\
+            \n字段名输出英文.\n需要提取字段如下,并按顺序输出：\nemploye_id:工号\nname:姓名\nposition:职位\nbase_salary：基本工资，数值类型\n\
+            performance_rating：绩效系数，数值类型\nperformance_salary：绩效工资，数值类型\nallowance：补贴，数值类型\n\
+            gross_salary:合计总薪资\n\n\n执行规则：\n1. 优先参考【数据库SQL查询结果】里面的真实薪资数据，以此为第一数据源；\n\
+            2. 如果数据库存在有效数据，如实提取对应数字；\n3. 如果数据库无有效数据，禁止编造数字，禁止强行输出0；\n4. 必须只返回纯净二维表格。\n"
+        - id: b66f7e37-c92d-49da-9d62-762c7a672355
+          role: user
+          text: '请生成以下员工的本月工资条。
+
+
+            【上月薪资数据】
+
+            {{#1787991668440.prev_record#}}
+
+
+            【本月薪资数据】
+
+            {{#1787991668440.cur_record#}}}
+
+
+            【本月是否生成标识】
+
+            {{#1787991668440.cur_generated#}}
+
+            （说明：值为 "true" 表示本月已生成；值为 "false" 表示本月尚未生成，请勿输出空表格。）
+
+
+            请严格按系统提示词的规则输出。
+
+
+            '
+        selected: false
+        title: 生成工资条
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1787996667305'
+      position:
+        x: 1405
+        y: 205.6
+      positionAbsolute:
+        x: 1405
+        y: 205.6
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: qwen3.7-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: c56b00aa-9d6f-480c-a70e-af427f6d9999
+          role: system
+          text: "你是一名 HR 薪资稳定性分析助手。基于用户提供的上月与本月薪资数据，生成一份**书面化、正式专业的详细报告**（不用表格，用 Markdown\
+            \ 标题分段，文字描述为主）。\n\n【前置判断 - 必须先做】\n读取 {{#1787991668440.cur_generated#}}\n\
+            - 如果 = \"false\"：直接输出一句话（不加任何分析、不要标题、不要报告格式）：\n  「本月尚未生成工资数据，无法进行稳定性对比。请先在系统中生成本月工资表（提供绩效系数）。」\n\
+            \  然后结束，不要输出其他内容。\n\n- 如果 = \"true\"：按以下 5 节结构输出完整书面报告：\n\n# 员工薪资稳定性分析报告\n\
+            \n## 一、岗位与职级稳定性\n（描述 position 本月与上月是否一致；未变视为稳定信号；若有变动需说明原因及影响。约 60~90\
+            \ 字）\n\n## 二、基本工资趋势\n（描述 base_salary 本月与上月对比：变动方向、幅度百分比；连续无变动视为积极，连续同向下调视为风险。约\
+            \ 60~90 字）\n\n## 三、绩效系数走势\n（描述 performance_rating 当前值与上月变化：落在 0.8~1.2\
+            \ 区间判稳定；>=1.0 持续判优秀；单次跌幅 >0.2 或频繁波动判不稳定。约 60~90 字）\n\n## 四、应发合计变动\n（描述\
+            \ gross_salary 变动方向、百分比，并归因到 base/bonus/allowance 哪一项。约 60~90 字）\n\n##\
+            \ 五、综合稳定性结论\n（给出等级：高 / 中 / 低；列出 1~2 条核心依据；给出 1 条后续关注或核实的建议。约 80~120 字）\n\
+            \n【硬性要求】\n- 必须使用以上 5 个 Markdown 标题（一/二/三/四/五），不要改名、不要合并。\n- 每节用一段完整书面化中文叙述，不要用项目符号列表（除\"\
+            五\"里可有 1 条建议）。\n- 不要输出报告以外的任何文字（如\"以下是报告\"、\"分析完毕\"、\"根据数据\"等开场白）。\n-\
+            \ 所有数值必须严格来自用户提供的 prev_record 与 cur_record，不得编造或外推。\n"
+        - id: ee9a6b66-42e3-4279-ad38-ab51bb4f2929
+          role: user
+          text: '请分析以下员工的薪资稳定性。
+
+
+            【上月薪资数据】
+
+            {{#1787991668440.prev_record#}}
+
+
+            【本月薪资数据】
+
+            {{#1787991668440.cur_record#}}
+
+
+            【本月是否生成标识】
+
+            {{#1787991668440.cur_generated#}}
+
+            （说明：值为 "true" 表示本月已生成工资表；值为 "false" 表示本月尚未生成，请勿把上月数据冒充本月。）
+
+
+            请严格按系统提示词的规则输出。
+
+
+            '
+        selected: false
+        title: 员工是否稳定报告生成
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1787998333396'
+      position:
+        x: 1405
+        y: 372.6
+      positionAbsolute:
+        x: 1405
+        y: 372.6
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        outputs:
+        - value_selector:
+          - '1787998333396'
+          - text
+          value_type: string
+          variable: text
+        - value_selector:
+          - '1787996667305'
+          - text
+          value_type: string
+          variable: text_1
+        selected: false
+        title: 输出 2
+        type: end
+      height: 114
+      id: '1788000020496'
+      position:
+        x: 1766
+        y: 331.16666666666663
+      positionAbsolute:
+        x: 1766
+        y: 331.16666666666663
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        classes:
+        - id: '1'
+          label: CLASS 1
+          name: 查询薪资
+        - id: '1788001788020'
+          label: CLASS 3
+          name: 生成当月工资条
+        - id: '2'
+          label: CLASS 2
+          name: 生成员工信息报告
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: qwen3.7-max
+          provider: langgenius/tongyi/tongyi
+        query_variable_selector:
+        - '1787974987375'
+        - query
+        selected: false
+        title: 问题分类器
+        type: question-classifier
+        vision:
+          enabled: false
+      height: 219
+      id: '1788001558846'
+      position:
+        x: 342
+        y: 140.77142857142857
+      positionAbsolute:
+        x: 342
+        y: 140.77142857142857
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        classes:
+        - id: '1'
+          label: CLASS 1
+          name: 生成工资条
+        - id: '2'
+          label: CLASS 2
+          name: 生成员工信息报告
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: qwen3.7-max
+          provider: langgenius/tongyi/tongyi
+        query_variable_selector:
+        - '1787974987375'
+        - query
+        selected: false
+        title: 问题分类器 2
+        type: question-classifier
+        vision:
+          enabled: false
+      height: 177
+      id: '1788001971309'
+      position:
+        x: 1044
+        y: 250.39999999999998
+      positionAbsolute:
+        x: 1044
+        y: 250.39999999999998
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    viewport:
+      x: -913.0500000000011
+      y: 47.78333333333316
+      zoom: 0.7000000000000005
+  rag_pipeline_variables: []

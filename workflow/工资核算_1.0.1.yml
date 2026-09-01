@@ -1,0 +1,702 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: 工资核算_1.0.0
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.2.15@1df8bd27d67c149e6db3c210830ef6e3857c5a9df5e8edbe9e785b995f337ef5
+    version: null
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload: {}
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: start
+        targetType: if-else
+      id: 1787921321788-source-1787923250702-target
+      selected: false
+      source: '1787921321788'
+      sourceHandle: source
+      target: '1787923250702'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: if-else
+        targetType: code
+      id: 1787923250702-ef2f9815-ef6a-4c89-a1d2-5cff39711210-1787989534179-target
+      selected: false
+      source: '1787923250702'
+      sourceHandle: ef2f9815-ef6a-4c89-a1d2-5cff39711210
+      target: '1787989534179'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: if-else
+        targetType: code
+      id: 1787923250702-false-1788073973616-target
+      selected: false
+      source: '1787923250702'
+      sourceHandle: 'false'
+      target: '1788073973616'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: if-else
+        targetType: code
+      id: 1787923250702-true-1787997245274-target
+      selected: false
+      source: '1787923250702'
+      sourceHandle: 'true'
+      target: '1787997245274'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: llm
+        targetType: end
+      id: 1787925737670-source-1787928280688-target
+      selected: false
+      source: '1787925737670'
+      sourceHandle: source
+      target: '1787928280688'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: template-transform
+        targetType: llm
+      id: 1787926130912-source-1787925737670-target
+      selected: false
+      source: '1787926130912'
+      sourceHandle: source
+      target: '1787925737670'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: code
+        targetType: end
+      id: 1787989534179-source-1787989905765-target
+      selected: false
+      source: '1787989534179'
+      sourceHandle: source
+      target: '1787989905765'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: code
+        targetType: if-else
+      id: 1787997245274-source-1787998185258-target
+      selected: false
+      source: '1787997245274'
+      sourceHandle: source
+      target: '1787998185258'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: if-else
+        targetType: template-transform
+      id: 1787998185258-false-1787926130912-target
+      selected: false
+      source: '1787998185258'
+      sourceHandle: 'false'
+      target: '1787926130912'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: if-else
+        targetType: end
+      id: 1787998185258-true-1787998272084-target
+      selected: false
+      source: '1787998185258'
+      sourceHandle: 'true'
+      target: '1787998272084'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        iteration_id: null
+        loop_id: null
+        sourceType: code
+        targetType: end
+      id: 1788073973616-source-1788074211182-target
+      source: '1788073973616'
+      sourceHandle: source
+      target: '1788074211182'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: 职工姓名
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: name
+        - default: ''
+          hint: ''
+          label: 工号
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: id
+        - default: ''
+          hint: ''
+          label: 输入‘查询’或者‘工资条’
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: todo
+        - default: ''
+          hint: ''
+          label: 绩效系数（查询不填）
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: false
+          type: number
+          variable: performance_rating
+      height: 186
+      id: '1787921321788'
+      position:
+        x: 0
+        y: 109.25714285714282
+      positionAbsolute:
+        x: 0
+        y: 109.25714285714282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: contains
+            id: 665a799c-7bf2-4388-878f-8e00c9ee4cf0
+            value: 查询
+            varType: string
+            variable_selector:
+            - '1787921321788'
+            - todo
+          id: 'true'
+          logical_operator: and
+        - case_id: ef2f9815-ef6a-4c89-a1d2-5cff39711210
+          conditions:
+          - comparison_operator: contains
+            id: f6ce692e-7a7e-4050-8872-f1b5eb5cfd82
+            value: 工资条
+            varType: string
+            variable_selector:
+            - '1787921321788'
+            - todo
+          id: ef2f9815-ef6a-4c89-a1d2-5cff39711210
+          logical_operator: and
+        selected: false
+        title: 条件分支
+        type: if-else
+      height: 171
+      id: '1787923250702'
+      position:
+        x: 342
+        y: 147.7571428571428
+      positionAbsolute:
+        x: 342
+        y: 147.7571428571428
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.3
+          mode: chat
+          name: qwen3.7-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: c9b56942-496a-4e3a-bb6f-8c966960cbdf
+          role: system
+          text: "你是一名资深 HR 薪酬分析师，擅长基于员工工资数据评估收入稳定性并撰写专业、客观、可执行的稳定情况报告。\n\n数据说明：\n\
+            - 输入分为【上月工资】和【当月工资条】两部分，并附带【报告日期】。\n- 可用字段：工号(employee_id)、姓名(name)、职位(position)、基本工资(base_salary)、绩效评级(performance_rating)、绩效奖金(performance_bonus)、补贴(allowance)、应发合计(gross_salary)、报告日期(report_date)。\n\
+            - 上月数据来自 `employee_salary_last_month`（上个月工资数据/基准）；当月工资条(`employee_salary_this_month`)由用户输入绩效系数后计算生成。\n\
+            \n任务：\n1. 分析当月工资条：应发合计、构成（基本工资/绩效奖金/补贴）、绩效系数含义。\n2. 对比两个月数据：计算基本工资、绩效奖金、补贴、应发合计的变化（金额+比率），重点对比上月→当月的波动幅度。\n\
+            3. 生成《职工工资稳定情况报告》，含：职工基本信息（含报告日期）、当月工资明细、两月对比分析、稳定性结论、风险提示与建议。\n\n报告格式要求：\n\
+            - 第一大节标题固定为：\"一、职工基本信息\"\n  - 其中\"报告周期\"一栏的内容必须写：\"上月工资 vs 当月工资\"\n  -\
+            \ \"报告日期\"填写模板提供的 `report_date`，格式 YYYY-MM-DD，严禁使用\"[当前日期]\"占位符\n- 第二大节标题固定为：\"\
+            二、当月工资明细分析\"\n  - 该节开头固定写：\"根据查询数据，该员工当月工资构成如下：\"\n  - 严禁出现\"employee_salary_last_month\"\
+            、\"employee_salary_this_month\"、\"下个月\"、\"下月工资条\"、\"历史工资表\"等表名或内部表述\n\
+            - 第三大节标题固定为：\"三、两月工资对比分析\"\n- 第四大节标题固定为：\"四、稳定性结论与建议\"\n\n要求：\n- 仅依据提供的数据，严禁臆造数字。\n\
+            - 如果上月数据缺失，在报告中明确说明。"
+        - id: b9801e1c-8bc1-4e19-9940-6984eeee980f
+          role: user
+          text: '请基于以下数据生成《职工工资稳定情况报告》。
+
+
+            {{#1787926130912.output#}}'
+        selected: false
+        title: 员工稳定情况报告生成
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1787925737670'
+      position:
+        x: 1746
+        y: 157.5
+      positionAbsolute:
+        x: 1746
+        y: 157.5
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        selected: false
+        template: "【员工基本信息】\r\n工号：{{ report_data.next_month.employee_id }}\r\n姓名：{{\
+          \ report_data.next_month.name }}\r\n职位：{{ report_data.next_month.position\
+          \ }}\r\n报告日期：{{ report_data.report_date }}\r\n\r\n【上个月工资数据】\r\n- 基本工资：{{\
+          \ report_data.current_month.base_salary }}\r\n- 绩效系数：{{ report_data.current_month.performance_rating\
+          \ }}\r\n- 绩效奖金：{{ report_data.current_month.performance_bonus }}\r\n- 补贴：{{\
+          \ report_data.current_month.allowance }}\r\n- 应发合计：{{ report_data.current_month.gross_salary\
+          \ }}\r\n\r\n【当月工资条数据】\r\n- 基本工资：{{ report_data.next_month.base_salary }}\r\
+          \n- 绩效系数：{{ report_data.next_month.performance_rating }}\r\n- 绩效奖金：{{ report_data.next_month.performance_bonus\
+          \ }}\r\n- 补贴：{{ report_data.next_month.allowance }}\r\n- 应发合计：{{ report_data.next_month.gross_salary\
+          \ }}\r\n\r\n请基于以上两个月的工资数据，生成《职工工资稳定情况报告》。"
+        title: 模板转换
+        type: template-transform
+        variables:
+        - value_selector:
+          - '1787997245274'
+          - report_data
+          value_type: object
+          variable: report_data
+      height: 51
+      id: '1787926130912'
+      position:
+        x: 1405
+        y: 167
+      positionAbsolute:
+        x: 1405
+        y: 167
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        outputs:
+        - value_selector:
+          - '1787925737670'
+          - text
+          value_type: string
+          variable: report
+        selected: false
+        title: 员工稳定情况报告输出
+        type: end
+      height: 87
+      id: '1787928280688'
+      position:
+        x: 2087
+        y: 172
+      positionAbsolute:
+        x: 2087
+        y: 172
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        code: "import pymysql\nfrom decimal import Decimal\nimport datetime\nimport\
+          \ traceback\n\n\ndef main(id: str = None, performance_rating: float = None,\
+          \ input_data: dict = None, **kwargs) -> dict:\n    # 兼容两种调用方式：\n    # 1.\
+          \ Dify 把输入变量作为独立参数传入：main(id=..., performance_rating=...)\n    # 2. Dify\
+          \ 把输入变量包成字典传入：main(input_data={...})\n    if input_data:\n        id = input_data.get(\"\
+          id\", id)\n        performance_rating = input_data.get(\"performance_rating\"\
+          , performance_rating)\n\n    # 1. 获取输入参数\n    emp_id = id\n    new_rating\
+          \ = performance_rating\n\n    if not emp_id:\n        return {\"result\"\
+          : {\"error\": \"缺少员工工号 id\"}}\n    if new_rating is None:\n        return\
+          \ {\"result\": {\"error\": \"缺少绩效系数 performance_rating\"}}\n\n    try:\n\
+          \        new_rating = Decimal(str(new_rating))\n    except Exception:\n\
+          \        return {\"result\": {\"error\": \"performance_rating 必须是有效数字\"\
+          }}\n\n    # 2. JSON 序列化转换函数\n    def to_json(v):\n        if v is None:\n\
+          \            return None\n        if isinstance(v, Decimal):\n         \
+          \   return float(v)\n        if isinstance(v, (datetime.datetime, datetime.date)):\n\
+          \            return v.isoformat()\n        if isinstance(v, datetime.timedelta):\n\
+          \            return str(v)\n        if isinstance(v, (bytes, bytearray)):\n\
+          \            return v.decode('utf-8', errors='ignore')\n        return v\n\
+          \n    # 3. 连接数据库\n    conn = pymysql.connect(\n        host='192.168.45.82',\
+          \  # 填入本机ip\n        port=3306,\n        user='root',\n        password='root',\n\
+          \        database='company_agent',\n        charset='utf8mb4'\n    )\n\n\
+          \    try:\n        with conn.cursor() as cur:\n            # 4. 查询原员工数据（不查\
+          \ performance_bonus，奖金由新公式独立计算）\n            cur.execute(\n            \
+          \    \"SELECT employee_id, name, position, base_salary, allowance \"\n \
+          \               \"FROM employee_salary_last_month WHERE employee_id = %s\"\
+          ,\n                (str(emp_id),)\n            )\n            row = cur.fetchone()\n\
+          \n            if not row:\n                return {\"result\": {\"error\"\
+          : f\"未找到员工工号 {emp_id}\"}}\n\n            columns = [desc[0] for desc in\
+          \ cur.description]\n            emp = dict(zip(columns, row))\n\n      \
+          \      # 5. 用新绩效系数计算工资\n            base_salary = Decimal(str(emp[\"base_salary\"\
+          ]))\n            allowance = Decimal(str(emp[\"allowance\"]))\n        \
+          \    performance_bonus = new_rating * Decimal(\"10000\")\n            gross_salary\
+          \ = base_salary + performance_bonus + allowance\n\n            emp[\"performance_rating\"\
+          ] = new_rating\n            emp[\"performance_bonus\"] = performance_bonus\n\
+          \            emp[\"gross_salary\"] = gross_salary\n\n            # 6. 插入/更新到当月工资条表\n\
+          \            insert_sql = \"\"\"\n            INSERT INTO employee_salary_this_month\
+          \ \n            (`employee_id`, `name`, `position`, `base_salary`, `performance_rating`,\
+          \ \n             `performance_bonus`, `allowance`, `gross_salary`)\n   \
+          \         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)\n            ON DUPLICATE\
+          \ KEY UPDATE\n            `name` = VALUES(`name`),\n            `position`\
+          \ = VALUES(`position`),\n            `base_salary` = VALUES(`base_salary`),\n\
+          \            `performance_rating` = VALUES(`performance_rating`),\n    \
+          \        `performance_bonus` = VALUES(`performance_bonus`),\n          \
+          \  `allowance` = VALUES(`allowance`),\n            `gross_salary` = VALUES(`gross_salary`)\n\
+          \            \"\"\"\n\n            cur.execute(insert_sql, (\n         \
+          \       emp_id,\n                emp.get(\"name\"),\n                emp.get(\"\
+          position\"),\n                float(base_salary),\n                float(new_rating),\n\
+          \                float(performance_bonus),\n                float(allowance),\n\
+          \                float(gross_salary)\n            ))\n            conn.commit()\n\
+          \n            # 7. 构造返回结果（JSON 安全）\n            result = {k: to_json(v)\
+          \ for k, v in emp.items()}\n\n            # 8. 预生成 Markdown 工资条（输出节点可直接渲染）\n\
+          \            markdown = f\"\"\"## 当月工资条\n\n| 项目 | 内容 |\n|---|---|\n| 工号\
+          \ | {emp_id} |\n| 姓名 | {emp.get(\"name\", \"\")} |\n| 职位 | {emp.get(\"position\"\
+          , \"\")} |\n| 基本工资 | ¥{float(base_salary):,.2f} |\n| 绩效系数 | {float(new_rating)}\
+          \ |\n| 绩效奖金 | ¥{float(performance_bonus):,.2f} |\n| 补贴 | ¥{float(allowance):,.2f}\
+          \ |\n| **应发合计** | **¥{float(gross_salary):,.2f}** |\n\"\"\"\n\n        return\
+          \ {\n            \"result\": {\n                \"data\": result,\n    \
+          \            \"markdown\": markdown,\n                \"message\": \"当月工资条生成成功\"\
+          \n            }\n        }\n\n    except Exception as e:\n        return\
+          \ {\n            \"result\": {\n                \"error\": str(e),\n   \
+          \             \"traceback\": traceback.format_exc()\n            }\n   \
+          \     }\n    finally:\n        try:\n            conn.close()\n        except\
+          \ Exception:\n            pass"
+        code_language: python3
+        outputs:
+          result:
+            children: null
+            type: object
+        selected: false
+        title: 生成工资条
+        type: code
+        variables:
+        - value_selector:
+          - '1787921321788'
+          - id
+          value_type: string
+          variable: id
+        - value_selector:
+          - '1787921321788'
+          - performance_rating
+          value_type: number
+          variable: performance_rating
+      height: 51
+      id: '1787989534179'
+      position:
+        x: 703
+        y: 244.39999999999998
+      positionAbsolute:
+        x: 703
+        y: 244.39999999999998
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        outputs:
+        - value_selector:
+          - '1787989534179'
+          - result
+          value_type: object
+          variable: result1
+        selected: false
+        title: 生成工资条输出
+        type: end
+      height: 87
+      id: '1787989905765'
+      position:
+        x: 1044
+        y: 234.89999999999998
+      positionAbsolute:
+        x: 1044
+        y: 234.89999999999998
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        code: "import pymysql\nfrom decimal import Decimal\nimport datetime\nimport\
+          \ traceback\n\n\ndef main(id: str = None, input_data: dict = None, **kwargs)\
+          \ -> dict:\n    if input_data:\n        id = input_data.get(\"id\", id)\n\
+          \n    emp_id = id\n    if not emp_id:\n        return {\"report_data\":\
+          \ {}, \"error_msg\": \"缺少员工工号 id\"}\n\n    def to_json(v):\n        if v\
+          \ is None:\n            return None\n        if isinstance(v, Decimal):\n\
+          \            return float(v)\n        if isinstance(v, (datetime.datetime,\
+          \ datetime.date)):\n            return v.isoformat()\n        if isinstance(v,\
+          \ datetime.timedelta):\n            return str(v)\n        if isinstance(v,\
+          \ (bytes, bytearray)):\n            return v.decode('utf-8', errors='ignore')\n\
+          \        return v\n\n    def fetch_one_dict(cur):\n        row = cur.fetchone()\n\
+          \        if not row:\n            return None\n        columns = [desc[0]\
+          \ for desc in cur.description]\n        return {col: to_json(val) for col,\
+          \ val in zip(columns, row)}\n\n    conn = pymysql.connect(\n        host='192.168.45.82',\
+          \  # 填入本机ip\n        port=3306,\n        user='root',\n        password='root',\n\
+          \        database='company_agent',\n        charset='utf8mb4'\n    )\n\n\
+          \    try:\n        with conn.cursor() as cur:\n            # 1. 查当月工资条（必须先存在）\n\
+          \            cur.execute(\n                \"SELECT * FROM employee_salary_this_month\
+          \ WHERE employee_id = %s\",\n                (str(emp_id),)\n          \
+          \  )\n            next_month = fetch_one_dict(cur)\n\n            if not\
+          \ next_month:\n                return {\n                    \"report_data\"\
+          : {},\n                    \"error_msg\": f\"未找到员工 {emp_id} 的当月工资条数据。请先输入'工资条'并提供绩效系数。\"\
+          \n                }\n\n            # 2. 查上个月工资数据（基准）\n            cur.execute(\n\
+          \                \"SELECT * FROM employee_salary_last_month WHERE employee_id\
+          \ = %s\",\n                (str(emp_id),)\n            )\n            current_month\
+          \ = fetch_one_dict(cur)\n\n        # 生成报告日期：YYYY-MM-DD\n        report_date\
+          \ = datetime.date.today().isoformat()\n\n        return {\n            \"\
+          report_data\": {\n                \"report_date\": report_date,\n      \
+          \          \"current_month\": current_month,\n                \"next_month\"\
+          : next_month\n            },\n            \"error_msg\": \"\"\n        }\n\
+          \n    except Exception as e:\n        return {\n            \"report_data\"\
+          : {},\n            \"error_msg\": f\"查询出错：{str(e)}\"\n        }\n    finally:\n\
+          \        try:\n            conn.close()\n        except Exception:\n   \
+          \         pass"
+        code_language: python3
+        outputs:
+          error_msg:
+            children: null
+            type: string
+          report_data:
+            children: null
+            type: object
+        selected: false
+        title: 查询并生成报告
+        type: code
+        variables:
+        - value_selector:
+          - '1787921321788'
+          - id
+          value_type: string
+          variable: id
+      height: 51
+      id: '1787997245274'
+      position:
+        x: 703
+        y: 59.39999999999999
+      positionAbsolute:
+        x: 703
+        y: 59.39999999999999
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: not empty
+            id: 3cbc8aa4-776d-4de8-9f5d-055de9894e73
+            value: ''
+            varType: string
+            variable_selector:
+            - '1787997245274'
+            - error_msg
+          id: 'true'
+          logical_operator: and
+        selected: false
+        title: 判断是否缺少输入
+        type: if-else
+      height: 123
+      id: '1787998185258'
+      position:
+        x: 1044
+        y: 31.89999999999999
+      positionAbsolute:
+        x: 1044
+        y: 31.89999999999999
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        outputs:
+        - value_selector:
+          - '1787997245274'
+          - error_msg
+          value_type: string
+          variable: error_msg
+        selected: false
+        title: 缺少输入的输出
+        type: end
+      height: 87
+      id: '1787998272084'
+      position:
+        x: 1405
+        y: 0
+      positionAbsolute:
+        x: 1405
+        y: 0
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        code: "def main(arg=None, input_data=None, **kwargs) -> dict:\n    # 兼容 input_data\
+          \ 传参\n    if input_data:\n        arg = input_data.get(\"arg\", arg)\n \
+          \   \n    if not arg:\n        return {\"result\": \"请输入有效的指令：「查询」或「工资条」。\"\
+          }\n    \n    return {\"result\": f\"不接受「{arg}」，只支持「查询」或「工资条」。\"}\n"
+        code_language: python3
+        outputs:
+          result:
+            children: null
+            type: string
+        selected: false
+        title: todo非法提醒
+        type: code
+        variables:
+        - value_selector:
+          - '1787921321788'
+          - todo
+          value_type: string
+          variable: arg
+      height: 51
+      id: '1788073973616'
+      position:
+        x: 703
+        y: 393.4
+      positionAbsolute:
+        x: 703
+        y: 393.4
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        outputs:
+        - value_selector:
+          - '1788073973616'
+          - result
+          value_type: string
+          variable: result
+        selected: false
+        title: todo非法输出
+        type: end
+      height: 51
+      id: '1788074211182'
+      position:
+        x: 1044
+        y: 401.9
+      positionAbsolute:
+        x: 1044
+        y: 401.9
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    viewport:
+      x: -85.65000000000015
+      y: 260.62
+      zoom: 0.7
+  rag_pipeline_variables: []

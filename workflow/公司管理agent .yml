@@ -1,0 +1,245 @@
+agent:
+  package_ref: agent_1
+agent_packages:
+  agent_1:
+    metadata:
+      description: 公司管理agent
+      icon: 🧸
+      icon_background: '#F5F3FF'
+      icon_type: emoji
+      name: 公司管理agent
+      role: 公司管理专家
+    omitted_assets: []
+    schema_version: 1
+    soul:
+      app_features:
+        annotation_reply:
+          enabled: false
+        file_upload:
+          allowed_file_extensions:
+          - JPG
+          - JPEG
+          - PNG
+          - GIF
+          - WEBP
+          - SVG
+          allowed_file_types:
+          - image
+          - document
+          allowed_file_upload_methods:
+          - local_file
+          enabled: true
+          image:
+            enabled: true
+          number_limits: 3
+        opening_statement: ''
+        retriever_resource:
+          enabled: false
+        sensitive_word_avoidance:
+          config: null
+          enabled: false
+          type: null
+        speech_to_text:
+          enabled: false
+        suggested_questions: []
+        suggested_questions_after_answer:
+          enabled: false
+          model: null
+          prompt: null
+        text_to_speech:
+          autoPlay: null
+          enabled: false
+          language: null
+          voice: null
+      app_variables: []
+      config_files: []
+      config_note: "# 公司管理系统助手\n\n## 角色定位\n你是一个专业的公司管理系统助手，负责协助员工处理日常行政事务。\n当用户输入考勤，调用\
+        \ 用户查询(单人)\n当需要考核评估报告的时候，调用工作流 进阶考核管理端 \n当用户传入文件需要评定考试、考核、测试结果时调用 Test evaluation\n\
+        当需要查询岗位信息时，包括岗位介绍、岗位概述、工作内容、胜任能力要求、能力培养路径，调用 job_description and test_generation\n\
+        用户如果要查询生成当月工资条,必须要先让用户输入工号和绩效系数,才能生成当月.\n如果是普通查询过往薪资,可直接输入对应信息查询.\n薪资核算查询等问题可调用\
+        \ 工资核算并插入数据库 ,最终以表格或报告形式输出,在输出时,不向用户展示调用的工作流.  \n员工进行费用报销时调用工作流   费用报销\n管理员查询费用报销信息调用工作流\
+        \ 报销费用管理端\n\n## 费用报销流程说明\n1. 收集申请人姓名、部门及报销凭证文件。\n2. 若用户提供的是 `local_file` 类型的文件引用（`dify-file-ref:...`），需先使用\
+        \ `dify-agent file download` 下载到本地。\n3. 由于报销工具 `222` 需要 HTTP/HTTPS 格式的 `files_url`，需使用\
+        \ `dify-agent file upload <local_path>` 将本地文件上传为 `tool_file` 类型，获取 `public_download_url`。\n\
+        4. 调用 `222` 工具，传入 `applicant_name`, `department` 和上一步获取的 `public_download_url`\
+        \ 作为 `files_url`。\n5. 注意：优先使用 `222` 工具进行报销申请。\n"
+      config_skills: []
+      env:
+        secret_refs: []
+        variables: []
+      human:
+        contacts: []
+        tools: []
+      knowledge:
+        sets: []
+      memory:
+        artifacts: []
+        budget: null
+        scope: null
+      misc_legacy:
+        file_upload:
+          allowed_file_extensions:
+          - JPG
+          - JPEG
+          - PNG
+          - GIF
+          - WEBP
+          - SVG
+          allowed_file_types:
+          - document
+          - image
+          - audio
+          - video
+          allowed_file_upload_methods:
+          - local_file
+          - remote_url
+          enabled: true
+          image:
+            enabled: true
+          number_limits: 3
+        opening_statement: null
+        retriever_resource: null
+        sensitive_word_avoidance: null
+        speech_to_text: null
+        suggested_questions: null
+        suggested_questions_after_answer: null
+        text_to_speech: null
+      model:
+        credential_ref: null
+        model: kimi-k2.5
+        model_provider: langgenius/tongyi/tongyi
+        model_settings:
+          frequency_penalty: null
+          max_tokens: null
+          presence_penalty: null
+          response_format: null
+          stop: null
+          temperature: null
+          top_p: null
+        plugin_id: langgenius/tongyi
+      prompt:
+        system_prompt: "# 公司管理系统助手\n\n## 角色定位\n你是一个专业的公司管理系统助手，负责协助员工处理日常行政事务。\n当用户输入考勤，调用\
+          \ [§tool:2d8d5182-d70c-49eb-b02f-7d64ec14d7cb/*:用户查询(单人)§]\n当需要考核评估报告的时候，调用工作流\
+          \ [§tool:17227cd7-5bd8-4f06-85bc-323c080a1ade/*:进阶考核管理端§]  \n当用户传入文件需要评定考试、考核、测试结果时调用\
+          \ [§tool:f18cbbca-727b-46fe-9533-4f4174e2fde9/*:Test evaluation§]\n当需要查询岗位信息时，包括岗位介绍、岗位概述、工作内容、胜任能力要求、能力培养路径，调用\
+          \ [§tool:6a713f52-2fa5-40d4-94bb-3c71794ab011/*:job_description and test_generation§]\n\
+          用户如果要查询生成当月工资条,必须要先让用户输入工号和绩效系数,才能生成当月.\n如果是普通查询过往薪资,可直接输入对应信息查询.\n薪资核算查询等问题可调用\
+          \ [§tool:246af7f3-6fe2-4459-8c18-3f1949694732/*:工资核算并插入数据库§] ,最终以表格或报告形式输出,在输出时,不向用户展示调用的工作流.\
+          \  \n员工进行费用报销时调用工作流   [§tool:f4250ded-860f-4f56-980e-1599247769bb/*:费用报销§]\n\
+          管理员查询费用报销信息调用工作流 [§tool:1ead6a28-eedd-4302-adf1-5879b7e44e2e/*:报销费用管理端§] "
+      sandbox:
+        config:
+          cpu: null
+          env: []
+          image: null
+          working_dir: null
+        provider: null
+      schema_version: 1
+      tools:
+        cli_tools: []
+        dify_tools:
+        - credential_ref: null
+          credential_type: unauthorized
+          description: null
+          enabled: true
+          name: null
+          plugin_id: null
+          provider: 报销费用管理端
+          provider_id: 1ead6a28-eedd-4302-adf1-5879b7e44e2e
+          provider_type: workflow
+          runtime_parameters: {}
+          tool_name: Expense_reimbursement_manager
+        - credential_ref: null
+          credential_type: unauthorized
+          description: null
+          enabled: true
+          name: null
+          plugin_id: null
+          provider: 工资核算_1.0.0
+          provider_id: 6396ea55-1a50-4a44-bd79-8832d65f2322
+          provider_type: workflow
+          runtime_parameters: {}
+          tool_name: salary
+        - credential_ref: null
+          credential_type: unauthorized
+          description: null
+          enabled: true
+          name: null
+          plugin_id: null
+          provider: 进阶考核管理端
+          provider_id: 17227cd7-5bd8-4f06-85bc-323c080a1ade
+          provider_type: workflow
+          runtime_parameters: {}
+          tool_name: Advanced_assessment
+        - credential_ref: null
+          credential_type: unauthorized
+          description: null
+          enabled: true
+          name: null
+          plugin_id: null
+          provider: 用户查询(单人)
+          provider_id: 2d8d5182-d70c-49eb-b02f-7d64ec14d7cb
+          provider_type: workflow
+          runtime_parameters: {}
+          tool_name: employee_query
+        - credential_ref: null
+          credential_type: unauthorized
+          description: null
+          enabled: true
+          name: null
+          plugin_id: null
+          provider: Test evaluation
+          provider_id: f18cbbca-727b-46fe-9533-4f4174e2fde9
+          provider_type: workflow
+          runtime_parameters: {}
+          tool_name: Test_evaluation
+        - credential_ref: null
+          credential_type: unauthorized
+          description: null
+          enabled: true
+          name: null
+          plugin_id: null
+          provider: 工资核算并插入数据库
+          provider_id: 246af7f3-6fe2-4459-8c18-3f1949694732
+          provider_type: workflow
+          runtime_parameters: {}
+          tool_name: salary_insert
+        - credential_ref: null
+          credential_type: unauthorized
+          description: null
+          enabled: true
+          name: null
+          plugin_id: null
+          provider: 费用报销
+          provider_id: f4250ded-860f-4f56-980e-1599247769bb
+          provider_type: workflow
+          runtime_parameters: {}
+          tool_name: '222'
+        - credential_ref: null
+          credential_type: unauthorized
+          description: null
+          enabled: true
+          name: null
+          plugin_id: null
+          provider: job_description and test_generation
+          provider_id: 679ecd92-15ce-48f4-a3d4-c2e3948d2ecc
+          provider_type: workflow
+          runtime_parameters: {}
+          tool_name: job_description_and_test_generation
+    workspace_skills: []
+app:
+  description: 公司管理agent
+  icon: 🧸
+  icon_background: '#F5F3FF'
+  icon_type: emoji
+  mode: agent
+  name: 公司管理agent
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.2.15@1df8bd27d67c149e6db3c210830ef6e3857c5a9df5e8edbe9e785b995f337ef5
+    version: null
+kind: app
+version: 0.7.0

@@ -1,0 +1,966 @@
+app:
+  description: 给员工答完的题目进行评分
+  icon: '+1'
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: Test evaluation
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.2.15@1df8bd27d67c149e6db3c210830ef6e3857c5a9df5e8edbe9e785b995f337ef5
+    version: null
+- current_identifier: null
+  type: package
+  value:
+    plugin_unique_identifier: junjiem/db_query:0.0.11@2eae0951f13c4e8daa099310d706c9502c349236bca81fcc996f2aea9524c97c
+    version: null
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload: {}
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: code
+      id: 17880014121920-source-17880014121921-target
+      selected: false
+      source: '17880014121920'
+      sourceHandle: source
+      target: '17880014121921'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: document-extractor
+      id: 1787998558797-source-1788001853533-target
+      source: '1787998558797'
+      sourceHandle: source
+      target: '1788001853533'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: document-extractor
+        targetType: code
+      id: 1788001853533-source-1788001980479-target
+      source: '1788001853533'
+      sourceHandle: source
+      target: '1788001980479'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: knowledge-retrieval
+      id: 1788001980479-source-17880014121920-target
+      source: '1788001980479'
+      sourceHandle: source
+      target: '17880014121920'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: tool
+      id: 17880014121921-source-1788010036891-target
+      source: '17880014121921'
+      sourceHandle: source
+      target: '1788010036891'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: tool
+        targetType: tool
+      id: 1788010036891-source-1788056858794-target
+      source: '1788010036891'
+      sourceHandle: source
+      target: '1788056858794'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: tool
+        targetType: llm
+      id: 1788056858794-source-1787998644450-target
+      source: '1788056858794'
+      sourceHandle: source
+      target: '1787998644450'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1787998644450-source-1788002401792-target
+      source: '1787998644450'
+      sourceHandle: source
+      target: '1788002401792'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - allowed_file_extensions: []
+          allowed_file_types:
+          - image
+          - document
+          allowed_file_upload_methods:
+          - local_file
+          - remote_url
+          default: ''
+          hide: false
+          hint: ''
+          label: text_result
+          max_length: 5
+          options: []
+          placeholder: ''
+          required: true
+          type: file-list
+          variable: text_result
+        - default: ''
+          hint: ''
+          label: emp_id
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: emp_id
+      height: 134
+      id: '1787998558797'
+      position:
+        x: -113.64382267672465
+        y: 291.9853050762556
+      positionAbsolute:
+        x: -113.64382267672465
+        y: 291.9853050762556
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - '17880014121921'
+          - result
+        model:
+          completion_params:
+            enable_thinking: false
+            temperature: 0.7
+          mode: chat
+          name: qwen3.8-max
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: becb7486-86f6-4cd9-b60b-a6f9de71a73e
+          role: system
+          text: "#角色 \n你是企业物流岗位试卷专业阅卷专家，严格依据知识库检索获取的标准答案，对Word文档解析出来的考生作答试卷进行批改打分，试卷满分100分。\n\
+            \ #题型分值分配（整套试卷共10道题） \n1.单选题：共3道，每题8分，合计24分；答对得8分，答错、未作答得0分。\n 2.多选题：共4道，每题13分，合计52分；全部选对得13分；只要出现错误选项，本题得0分；无错选仅漏选，每选对1个选项得3.25分；未作答得0分。\n\
+            \ 3.判断题：共3道，每题8分，合计24分；答对得8分，答错、未作答得0分。 >总分：24+52+24=100分 #输入变量说明 \n【考生作答文档内容（来自文档提取节点解析Word）】\
+            \ {{#1788001853533.text#}}\n【知识库检索得到试卷题干+标准答案】 {{#17880014121921.result#}}\n\
+            #硬性阅卷规则 \n1.判分唯一依据为知识库检索返回的标准答案，禁止自行编造答案，不允许主观评判。 \n2.逐题批改，识别题号、题型，提取考生填写答案；考生未作答则本题记0分。\
+            \ \n3.多选题严格区分错选、漏选规则：只要包含错误选项直接0分；无错选仅有漏选按选项拆分给分。 \n4.比对题干，如果考生试卷与知识库标准答案题干不匹配，必须明确标注：「考生试卷与标准答案题干不匹配，部分题目无法完成批改」。\
+            \ \n5.输出使用Markdown表格展示判题明细；表格字段固定：题号｜题型｜考生答案｜标准答案｜本题得分。\n 6.表格完成后输出：单选题合计得分、多选题合计得分、判断题合计得分、试卷总得分（格式XX/100）。\
+            \ 7.最后输出简短综合评语：包含考生整体掌握情况、薄弱题型、针对性学习建议。\n8.根据SQL查新数据匹配用户输入的{{#1787998558797.emp_id#}}，提取数据库里对应的emp_id,name,position\n\
+            \ #输出格式参考示例 \n提交时间：{{#1788010036891.text#}}\n工号：emp_id   姓名：name  \n当前岗位：position\
+            \  目标岗位：（用户输入的文件标题岗位）\n|题号|题型|考生答案|标准答案|本题得分| \n|----|----|--------|--------|--------|\n\
+            |1|单选题|B|B|8| \n|2|多选题|B|A,B,C|3.25| \n单选题合计得分：8 多选题合计得分：3.25 判断题合计得分：0\
+            \ 试卷总得分：11.25 /100 综合评语：本次测试……"
+        - id: fea6db56-b8ad-4bb3-9986-58a3e4b526c2
+          role: user
+          text: '用户传入答题文件：{{#sys.files#}}
+
+            知识库检索内容：{{#context#}}
+
+            数据库查询：{{#1788056858794.text#}}'
+        selected: false
+        title: 试题判断
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1787998644450'
+      position:
+        x: 149.52222591055164
+        y: 622.1385264620673
+      positionAbsolute:
+        x: 149.52222591055164
+        y: 622.1385264620673
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        dataset_ids:
+        - 5kvgoSQsOy31B6dKpCpIViJH/CjzLaFUTM+mUsV47Wd6rNp/j0HgCBRIJV/tBS6z
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        multiple_retrieval_config:
+          reranking_enable: true
+          reranking_mode: reranking_model
+          reranking_model:
+            model: qwen3-rerank
+            provider: langgenius/tongyi/tongyi
+          score_threshold: 0.5
+          top_k: 3
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1788001980479'
+        - result
+        retrieval_mode: multiple
+        selected: false
+        title: 知识检索 (1)
+        type: knowledge-retrieval
+      height: 89
+      id: '17880014121920'
+      position:
+        x: -113.64382267672465
+        y: 615.3345763131242
+      positionAbsolute:
+        x: -113.64382267672465
+        y: 615.3345763131242
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        code: "def main(arg1):\n    # 遍历数组，取出每个字典的content字段，过滤空内容\n    content_list\
+          \ = [item.get(\"content\",\"\") for item in arg1 if isinstance(item,dict)]\n\
+          \    # 拼接成完整文本\n    full_text = \"\\n\\n\".join(content_list)\n    return\
+          \ {\n        \"result\": full_text\n    }"
+        code_language: python3
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        outputs:
+          result:
+            children: null
+            type: string
+        selected: false
+        title: 数组转换供大模型引用
+        type: code
+        variables:
+        - value_selector:
+          - '17880014121920'
+          - result
+          value_type: array[object]
+          variable: arg1
+      height: 51
+      id: '17880014121921'
+      position:
+        x: 156.32617605949463
+        y: 312.9853050762556
+      positionAbsolute:
+        x: 156.32617605949463
+        y: 312.9853050762556
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        is_array_file: true
+        selected: false
+        title: 文档提取器
+        type: document-extractor
+        variable_selector:
+        - '1787998558797'
+        - text_result
+      height: 103
+      id: '1788001853533'
+      position:
+        x: -113.64382267672465
+        y: 434.98183489956426
+      positionAbsolute:
+        x: -113.64382267672465
+        y: 434.98183489956426
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        code: "\ndef main(arg1):\n    return {\n        \"result\": \",\".join(arg1),\n\
+          \    }\n"
+        code_language: python3
+        outputs:
+          result:
+            children: null
+            type: string
+        selected: false
+        title: 代码执行 2
+        type: code
+        variables:
+        - value_selector:
+          - '1788001853533'
+          - text
+          value_type: array[string]
+          variable: arg1
+      height: 51
+      id: '1788001980479'
+      position:
+        x: -113.64382267672465
+        y: 551.8873348869248
+      positionAbsolute:
+        x: -113.64382267672465
+        y: 551.8873348869248
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        outputs:
+        - value_selector:
+          - '1787998644450'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 输出
+        type: end
+      height: 87
+      id: '1788002401792'
+      position:
+        x: 453.21035132721386
+        y: 628.0915765550867
+      positionAbsolute:
+        x: 453.21035132721386
+        y: 628.0915765550867
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        is_team_authorization: true
+        paramSchemas:
+        - auto_generate: null
+          default: '%Y-%m-%d %H:%M:%S'
+          form: form
+          human_description:
+            en_US: Time format in strftime standard.
+            ja_JP: Time format in strftime standard.
+            pt_BR: Time format in strftime standard.
+            zh_Hans: strftime 标准的时间格式。
+          input_schema: null
+          label:
+            en_US: Format
+            ja_JP: Format
+            pt_BR: Format
+            zh_Hans: 格式
+          llm_description: null
+          max: null
+          min: null
+          multiple: false
+          name: format
+          options: []
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: UTC
+          form: form
+          human_description:
+            en_US: Timezone
+            ja_JP: Timezone
+            pt_BR: Timezone
+            zh_Hans: 时区
+          input_schema: null
+          label:
+            en_US: Timezone
+            ja_JP: Timezone
+            pt_BR: Timezone
+            zh_Hans: 时区
+          llm_description: null
+          max: null
+          min: null
+          multiple: false
+          name: timezone
+          options:
+          - icon: null
+            label:
+              en_US: UTC
+              ja_JP: UTC
+              pt_BR: UTC
+              zh_Hans: UTC
+            value: UTC
+          - icon: null
+            label:
+              en_US: America/New_York
+              ja_JP: America/New_York
+              pt_BR: America/New_York
+              zh_Hans: 美洲/纽约
+            value: America/New_York
+          - icon: null
+            label:
+              en_US: America/Los_Angeles
+              ja_JP: America/Los_Angeles
+              pt_BR: America/Los_Angeles
+              zh_Hans: 美洲/洛杉矶
+            value: America/Los_Angeles
+          - icon: null
+            label:
+              en_US: America/Chicago
+              ja_JP: America/Chicago
+              pt_BR: America/Chicago
+              zh_Hans: 美洲/芝加哥
+            value: America/Chicago
+          - icon: null
+            label:
+              en_US: America/Sao_Paulo
+              ja_JP: America/Sao_Paulo
+              pt_BR: América/São Paulo
+              zh_Hans: 美洲/圣保罗
+            value: America/Sao_Paulo
+          - icon: null
+            label:
+              en_US: Asia/Shanghai
+              ja_JP: Asia/Shanghai
+              pt_BR: Asia/Shanghai
+              zh_Hans: 亚洲/上海
+            value: Asia/Shanghai
+          - icon: null
+            label:
+              en_US: Asia/Ho_Chi_Minh
+              ja_JP: Asia/Ho_Chi_Minh
+              pt_BR: Ásia/Ho Chi Minh
+              zh_Hans: 亚洲/胡志明市
+            value: Asia/Ho_Chi_Minh
+          - icon: null
+            label:
+              en_US: Asia/Tokyo
+              ja_JP: Asia/Tokyo
+              pt_BR: Asia/Tokyo
+              zh_Hans: 亚洲/东京
+            value: Asia/Tokyo
+          - icon: null
+            label:
+              en_US: Asia/Dubai
+              ja_JP: Asia/Dubai
+              pt_BR: Asia/Dubai
+              zh_Hans: 亚洲/迪拜
+            value: Asia/Dubai
+          - icon: null
+            label:
+              en_US: Asia/Kolkata
+              ja_JP: Asia/Kolkata
+              pt_BR: Asia/Kolkata
+              zh_Hans: 亚洲/加尔各答
+            value: Asia/Kolkata
+          - icon: null
+            label:
+              en_US: Asia/Seoul
+              ja_JP: Asia/Seoul
+              pt_BR: Asia/Seoul
+              zh_Hans: 亚洲/首尔
+            value: Asia/Seoul
+          - icon: null
+            label:
+              en_US: Asia/Singapore
+              ja_JP: Asia/Singapore
+              pt_BR: Asia/Singapore
+              zh_Hans: 亚洲/新加坡
+            value: Asia/Singapore
+          - icon: null
+            label:
+              en_US: Europe/London
+              ja_JP: Europe/London
+              pt_BR: Europe/London
+              zh_Hans: 欧洲/伦敦
+            value: Europe/London
+          - icon: null
+            label:
+              en_US: Europe/Berlin
+              ja_JP: Europe/Berlin
+              pt_BR: Europe/Berlin
+              zh_Hans: 欧洲/柏林
+            value: Europe/Berlin
+          - icon: null
+            label:
+              en_US: Europe/Moscow
+              ja_JP: Europe/Moscow
+              pt_BR: Europe/Moscow
+              zh_Hans: 欧洲/莫斯科
+            value: Europe/Moscow
+          - icon: null
+            label:
+              en_US: Australia/Sydney
+              ja_JP: Australia/Sydney
+              pt_BR: Australia/Sydney
+              zh_Hans: 澳大利亚/悉尼
+            value: Australia/Sydney
+          - icon: null
+            label:
+              en_US: Pacific/Auckland
+              ja_JP: Pacific/Auckland
+              pt_BR: Pacific/Auckland
+              zh_Hans: 太平洋/奥克兰
+            value: Pacific/Auckland
+          - icon: null
+            label:
+              en_US: Africa/Cairo
+              ja_JP: Africa/Cairo
+              pt_BR: Africa/Cairo
+              zh_Hans: 非洲/开罗
+            value: Africa/Cairo
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: select
+        params:
+          format: ''
+          timezone: ''
+        plugin_id: null
+        plugin_unique_identifier: ''
+        provider_icon: /console/api/workspaces/current/tool-provider/builtin/time/icon
+        provider_id: time
+        provider_name: time
+        provider_show_name: 时间
+        provider_type: builtin
+        selected: false
+        title: 获取当前时间
+        tool_configurations:
+          format:
+            type: mixed
+            value: '%Y-%m-%d %H:%M:%S'
+          timezone:
+            type: constant
+            value: UTC
+        tool_description: 一个用于获取当前时间的工具。
+        tool_label: 获取当前时间
+        tool_name: current_time
+        tool_node_version: '2'
+        tool_parameters: {}
+        type: tool
+      height: 113
+      id: '1788010036891'
+      position:
+        x: 156.32617605949463
+        y: 376.90810087382044
+      positionAbsolute:
+        x: 156.32617605949463
+        y: 376.90810087382044
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    - data:
+        is_team_authorization: true
+        paramSchemas:
+        - auto_generate: null
+          default: mysql
+          form: llm
+          human_description:
+            en_US: Used for selecting the database type, mysql, oracle, oracle11g,
+              postgresql or mssql.
+            ja_JP: Used for selecting the database type, mysql, oracle, oracle11g,
+              postgresql or mssql.
+            pt_BR: Used for selecting the database type, mysql, oracle, oracle11g,
+              postgresql or mssql.
+            zh_Hans: 用于选择数据库类型，mysql、oracle、oracle11g、postgresql或mssql。
+          input_schema: null
+          label:
+            en_US: Database type
+            ja_JP: Database type
+            pt_BR: Database type
+            zh_Hans: 数据库类型
+          llm_description: ''
+          max: null
+          min: null
+          multiple: false
+          name: db_type
+          options:
+          - icon: ''
+            label:
+              en_US: MySQL
+              ja_JP: MySQL
+              pt_BR: MySQL
+              zh_Hans: MySQL
+            value: mysql
+          - icon: ''
+            label:
+              en_US: Oracle
+              ja_JP: Oracle
+              pt_BR: Oracle
+              zh_Hans: Oracle
+            value: oracle
+          - icon: ''
+            label:
+              en_US: Oracle11g
+              ja_JP: Oracle11g
+              pt_BR: Oracle11g
+              zh_Hans: Oracle11g
+            value: oracle11g
+          - icon: ''
+            label:
+              en_US: PostgreSQL
+              ja_JP: PostgreSQL
+              pt_BR: PostgreSQL
+              zh_Hans: PostgreSQL
+            value: postgresql
+          - icon: ''
+            label:
+              en_US: Microsoft SQL Server
+              ja_JP: Microsoft SQL Server
+              pt_BR: Microsoft SQL Server
+              zh_Hans: Microsoft SQL Server
+            value: mssql
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: select
+        - auto_generate: null
+          default: localhost
+          form: llm
+          human_description:
+            en_US: Database hostname or IP address (Original string, not URL-encoded
+              string).
+            ja_JP: Database hostname or IP address (Original string, not URL-encoded
+              string).
+            pt_BR: Database hostname or IP address (Original string, not URL-encoded
+              string).
+            zh_Hans: 数据库的主机名或IP地址（原始字符串，非URL编码字符串）。
+          input_schema: null
+          label:
+            en_US: Database Host
+            ja_JP: Database Host
+            pt_BR: Database Host
+            zh_Hans: 数据库地址
+          llm_description: ''
+          max: null
+          min: null
+          multiple: false
+          name: db_host
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database port.
+            ja_JP: Database port.
+            pt_BR: Database port.
+            zh_Hans: 数据库的端口。
+          input_schema: null
+          label:
+            en_US: Port
+            ja_JP: Port
+            pt_BR: Port
+            zh_Hans: 端口
+          llm_description: ''
+          max: null
+          min: null
+          multiple: false
+          name: db_port
+          options: []
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: number
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database username (Original string, not URL-encoded string).
+            ja_JP: Database username (Original string, not URL-encoded string).
+            pt_BR: Database username (Original string, not URL-encoded string).
+            zh_Hans: 数据库的用户名（原始字符串，非URL编码字符串）。
+          input_schema: null
+          label:
+            en_US: Username
+            ja_JP: Username
+            pt_BR: Username
+            zh_Hans: 用户名
+          llm_description: ''
+          max: null
+          min: null
+          multiple: false
+          name: db_username
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database password (Original string, not URL-encoded string).
+            ja_JP: Database password (Original string, not URL-encoded string).
+            pt_BR: Database password (Original string, not URL-encoded string).
+            zh_Hans: 数据库的密码（原始字符串，非URL编码字符串）。
+          input_schema: null
+          label:
+            en_US: Password
+            ja_JP: Password
+            pt_BR: Password
+            zh_Hans: 密码
+          llm_description: ''
+          max: null
+          min: null
+          multiple: false
+          name: db_password
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: secret-input
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: Database name (Original string, not URL-encoded string).
+            ja_JP: Database name (Original string, not URL-encoded string).
+            pt_BR: Database name (Original string, not URL-encoded string).
+            zh_Hans: 数据库的名称（原始字符串，非URL编码字符串）。
+          input_schema: null
+          label:
+            en_US: Database name
+            ja_JP: Database name
+            pt_BR: Database name
+            zh_Hans: 库名
+          llm_description: ''
+          max: null
+          min: null
+          multiple: false
+          name: db_name
+          options: []
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
+            ja_JP: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
+            pt_BR: 'Database properties, for example: alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt'
+            zh_Hans: 数据库属性，例如：alt_host=host1&alt_host=host2&ssl_cipher=%2Fpath%2Fto%2Fcrt
+          input_schema: null
+          label:
+            en_US: Database properties
+            ja_JP: Database properties
+            pt_BR: Database properties
+            zh_Hans: 数据库属性
+          llm_description: ''
+          max: null
+          min: null
+          multiple: false
+          name: db_properties
+          options: []
+          placeholder: null
+          precision: null
+          required: false
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: null
+          form: llm
+          human_description:
+            en_US: 'SQL query statement, for example: select * from tbl_name'
+            ja_JP: 'SQL query statement, for example: select * from tbl_name'
+            pt_BR: 'SQL query statement, for example: select * from tbl_name'
+            zh_Hans: SQL查询语句，例如：select * from tbl_name
+          input_schema: null
+          label:
+            en_US: Query SQL
+            ja_JP: Query SQL
+            pt_BR: Query SQL
+            zh_Hans: SQL查询语句
+          llm_description: 'SQL query statement, for example: select * from tbl_name'
+          max: null
+          min: null
+          multiple: false
+          name: query_sql
+          options: []
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: string
+        - auto_generate: null
+          default: markdown
+          form: form
+          human_description:
+            en_US: Used for selecting the output format, markdown or json.
+            ja_JP: Used for selecting the output format, markdown or json.
+            pt_BR: Used for selecting the output format, markdown or json.
+            zh_Hans: 用于选择输出格式，markdown或json。
+          input_schema: null
+          label:
+            en_US: Output format
+            ja_JP: Output format
+            pt_BR: Output format
+            zh_Hans: 输出格式
+          llm_description: ''
+          max: null
+          min: null
+          multiple: false
+          name: output_format
+          options:
+          - icon: ''
+            label:
+              en_US: MARKDOWN
+              ja_JP: MARKDOWN
+              pt_BR: MARKDOWN
+              zh_Hans: MARKDOWN
+            value: markdown
+          - icon: ''
+            label:
+              en_US: JSON
+              ja_JP: JSON
+              pt_BR: JSON
+              zh_Hans: JSON
+            value: json
+          placeholder: null
+          precision: null
+          required: true
+          scope: null
+          template: null
+          type: select
+        params:
+          db_host: ''
+          db_name: ''
+          db_password: ''
+          db_port: ''
+          db_properties: ''
+          db_type: ''
+          db_username: ''
+          output_format: ''
+          query_sql: ''
+        plugin_id: junjiem/db_query
+        plugin_unique_identifier: junjiem/db_query:0.0.11@2eae0951f13c4e8daa099310d706c9502c349236bca81fcc996f2aea9524c97c
+        provider_icon: /console/api/workspaces/current/plugin/icon?tenant_id=86631c98-1bff-47b0-bb3e-283486691a67&filename=ce2ce5af47e39e9476fc06eea7fbd05446ad16043d4d16c671e69a3c650a976a.svg
+        provider_id: junjiem/db_query/db_query
+        provider_name: junjiem/db_query/db_query
+        provider_show_name: 数据库查询
+        provider_type: builtin
+        selected: false
+        title: SQL查询
+        tool_configurations:
+          output_format:
+            type: constant
+            value: markdown
+        tool_description: 数据库SQL查询工具。
+        tool_label: SQL查询
+        tool_name: sql_query
+        tool_node_version: '2'
+        tool_parameters:
+          db_host:
+            type: mixed
+            value: host.docker.internal
+          db_name:
+            type: mixed
+            value: company_agent
+          db_password:
+            type: mixed
+            value: root
+          db_port:
+            type: constant
+            value: 3306
+          db_properties:
+            type: mixed
+            value: charset=utf8mb4&collation=utf8mb4_0900_ai_ci
+          db_type:
+            type: constant
+            value: mysql
+          db_username:
+            type: mixed
+            value: root
+          query_sql:
+            type: mixed
+            value: SELECT emp_id,name,position FROM employees where emp_id={{#1787998558797.emp_id#}}
+        type: tool
+      height: 87
+      id: '1788056858794'
+      position:
+        x: 156.32617605949463
+        y: 494.4117423848486
+      positionAbsolute:
+        x: 156.32617605949463
+        y: 494.4117423848486
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+      zIndex: 0
+    viewport:
+      x: 224.69025877573455
+      y: -66.71783167211987
+      zoom: 0.8572439735251759
+  rag_pipeline_variables: []
