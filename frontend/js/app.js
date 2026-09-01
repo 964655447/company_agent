@@ -410,12 +410,17 @@ async function loadMyAttendance() {
   if (state.attPeriod === "specific" && state.attMonth) url += `&target_month=${state.attMonth}`;
   const data = await api(url);
   const rows = data.records || [];
-  const tbody = rows.length ? rows.map((r) => `
-    <tr><td>${esc(r.work_date)}</td><td>${r.type === "clock_in" ? "上班" : "下班"}</td>
-    <td>${fmtTime(r.checkin_time)}</td>
-    <td>${r.is_late ? '<span class="tag tag-danger">迟到</span>' : '<span class="tag tag-ok">正常</span>'}</td></tr>`).join("")
-    : `<tr class="empty"><td colspan="4">${emptyHTML("暂无打卡记录")}</td></tr>`;
-  $("#att-table").innerHTML = `<thead><tr><th>日期</th><th>类型</th><th>时间</th><th>状态</th></tr></thead><tbody>${tbody}</tbody>`;
+  renderPagedTable("myAtt", {
+    rows,
+    head: `<thead><tr><th>日期</th><th>类型</th><th>时间</th><th>状态</th></tr></thead>`,
+    tableSel: "#att-table",
+    pagerSel: "#my-att-pager",
+    colspan: 4,
+    emptyText: "暂无打卡记录",
+    render: (r) => `<tr><td>${esc(r.work_date)}</td><td>${r.type === "clock_in" ? "上班" : "下班"}</td>
+      <td>${fmtTime(r.checkin_time)}</td>
+      <td>${r.is_late ? '<span class="tag tag-danger">迟到</span>' : '<span class="tag tag-ok">正常</span>'}</td></tr>`
+  });
 }
 
 /* ---------------- 报销 ---------------- */
@@ -453,19 +458,26 @@ async function loadMyReimb() {
   lastMyReimbRows = rows;
   const range = data.range_end ? `${data.range_start} ~ ${data.range_end}` : "";
   $("#reimb-range").textContent = range ? `统计区间：${range}` : "";
-  const tbody = rows.length ? rows.map((r) => {
-    const [txt, cls] = REIMB_STATUS[r.status] || [r.status, "tag-gray"];
-    const raw = r.ocr_raw || "";
-    return `<tr><td>#${r.id}</td><td>${esc(r.category || "未填")}</td>
-      <td style="text-align:right">${money(r.amount)}</td>
-      <td><span class="tag ${cls}">${txt}</span></td>
-      <td>${fmtDT(r.submit_time)}</td>
-      <td><button class="link-btn" data-mat="${r.id}" title="点击查看完整材料信息">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-        ${matPreview(raw)}
-      </button></td></tr>`;
-  }).join("") : '<tr class="empty"><td colspan="6">暂无报销记录</td></tr>';
-  $("#reimb-table").innerHTML = `<thead><tr><th>单号</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th><th>材料信息</th></tr></thead><tbody>${tbody}</tbody>`;
+  renderPagedTable("myReimb", {
+    rows,
+    head: `<thead><tr><th>单号</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th><th>材料信息</th></tr></thead>`,
+    tableSel: "#reimb-table",
+    pagerSel: "#my-reimb-pager",
+    colspan: 6,
+    emptyText: "暂无报销记录",
+    render: (r) => {
+      const [txt, cls] = REIMB_STATUS[r.status] || [r.status, "tag-gray"];
+      const raw = r.ocr_raw || "";
+      return `<tr><td>#${r.id}</td><td>${esc(r.category || "未填")}</td>
+        <td style="text-align:right">${money(r.amount)}</td>
+        <td><span class="tag ${cls}">${txt}</span></td>
+        <td>${fmtDT(r.submit_time)}</td>
+        <td><button class="link-btn" data-mat="${r.id}" title="点击查看完整材料信息">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          ${matPreview(raw)}
+        </button></td></tr>`;
+    }
+  });
 }
 
 $("#reimb-table").addEventListener("click", (e) => {
@@ -500,15 +512,20 @@ async function loadMySalary() {
   const rows = data.records || [];
   const range = data.range_end ? `${data.range_start} ~ ${data.range_end}` : "";
   $("#salary-range").textContent = range ? `统计区间：${range}` : "";
-  const tbody = rows.length ? rows.map((r) => `
-    <tr><td>${esc(r.no)}</td><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${esc(r.position)}</td>
+  renderPagedTable("mySalary", {
+    rows,
+    head: `<thead><tr><th>序号</th><th>工号</th><th>姓名</th><th>岗位</th><th>基本工资</th><th>系数</th><th>绩效奖金</th><th>津贴</th><th>应发合计</th></tr></thead>`,
+    tableSel: "#salary-table",
+    pagerSel: "#my-salary-pager",
+    colspan: 9,
+    emptyText: "暂无工资核算记录，提交绩效后生成",
+    render: (r) => `<tr><td>${esc(r.no)}</td><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${esc(r.position)}</td>
       <td style="text-align:right">${money(r.base_salary)}</td>
       <td style="text-align:center">${Number(r.performance_rating || 0).toFixed(2)}</td>
       <td style="text-align:right">${money(r.performance_bonus)}</td>
       <td style="text-align:right">${money(r.allowance)}</td>
-      <td style="text-align:right"><b>${money(r.gross_salary)}</b></td></tr>`).join("")
-    : `<tr class="empty"><td colspan="9">${emptyHTML("暂无工资核算记录，提交绩效后生成", "完成绩效评估后将自动生成")}</td></tr>`;
-  $("#salary-table").innerHTML = `<thead><tr><th>序号</th><th>工号</th><th>姓名</th><th>岗位</th><th>基本工资</th><th>系数</th><th>绩效奖金</th><th>津贴</th><th>应发合计</th></tr></thead><tbody>${tbody}</tbody>`;
+      <td style="text-align:right"><b>${money(r.gross_salary)}</b></td></tr>`
+  });
 }
 
 /* ---------------- 考核 ---------------- */
@@ -786,17 +803,20 @@ async function loadAllScores() {
     let url = `/api/assessment/scores/all?period=${state.adminAssessPeriod}`;
     if (state.adminAssessPeriod === "specific" && state.adminAssessMonth) url += `&target_month=${state.adminAssessMonth}`;
     const r = await api(url);
-    const list = r.scores || [];
-    el.innerHTML = head + (list.length
-      ? `<tbody>${list.map((s) => `
-          <tr><td>${esc(s.name || "-")}</td>
-              <td>${s.employee_id}</td>
-              <td>${esc(s.original_position || "-")}</td>
-              <td>${esc(s.target_position || "-")}</td>
-              <td>${s.score ?? "-"}</td>
-              <td>${s.test_time ? s.test_time.slice(0, 10) : "-"}</td></tr>`).join("")}
-        </tbody>`
-      : "");
+    renderPagedTable("allScores", {
+      rows: r.scores || [],
+      head,
+      tableSel: "#admin-scores-table",
+      pagerSel: "#admin-scores-pager",
+      colspan: 6,
+      emptyText: "暂无考核成绩",
+      render: (s) => `<tr><td>${esc(s.name || "-")}</td>
+        <td>${s.employee_id}</td>
+        <td>${esc(s.original_position || "-")}</td>
+        <td>${esc(s.target_position || "-")}</td>
+        <td>${s.score ?? "-"}</td>
+        <td>${s.test_time ? s.test_time.slice(0, 10) : "-"}</td></tr>`
+    });
   } catch (err) {
     el.innerHTML = head;
   }
@@ -928,6 +948,84 @@ $("#admin-att-pager").addEventListener("change", (e) => {
   }
 });
 
+/* ---------------- 通用分页引擎（个人 / 管理多张表复用） ---------------- */
+/* state._pg[key] = { page, size, rows, render(row), head, tableSel, pagerSel, colspan, emptyText } */
+function _pgState(key) {
+  if (!state._pg) state._pg = {};
+  if (!state._pg[key]) state._pg[key] = { page: 1, size: 10, rows: [], render: null, head: "", tableSel: "", pagerSel: "", colspan: 1, emptyText: "暂无数据" };
+  return state._pg[key];
+}
+
+function renderPagedTable(key, opts) {
+  const ps = _pgState(key);
+  ps.rows = opts.rows || [];
+  ps.render = opts.render;
+  ps.head = opts.head;
+  ps.tableSel = opts.tableSel;
+  ps.pagerSel = opts.pagerSel;
+  ps.colspan = opts.colspan || 1;
+  ps.emptyText = opts.emptyText || "暂无数据";
+  ps.page = 1;
+  _drawPagedTable(key);
+}
+
+function _drawPagedTable(key) {
+  const ps = state._pg[key];
+  if (!ps) return;
+  const total = ps.rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / ps.size));
+  if (ps.page > totalPages) ps.page = totalPages;
+  const start = (ps.page - 1) * ps.size;
+  const pageRows = ps.rows.slice(start, start + ps.size);
+  const tbody = pageRows.length ? pageRows.map(ps.render).join("")
+    : `<tr class="empty"><td colspan="${ps.colspan}">${emptyHTML(ps.emptyText)}</td></tr>`;
+  const tbl = $(ps.tableSel);
+  if (tbl) tbl.innerHTML = ps.head + `<tbody>${tbody}</tbody>`;
+  const pager = $(ps.pagerSel);
+  if (!pager) return;
+  if (total === 0) { pager.innerHTML = ""; return; }
+  const cur = ps.page;
+  const from = start + 1, to = Math.min(start + ps.size, total);
+  let html = `<button class="pg-btn" data-pg="prev" data-key="${key}" ${cur === 1 ? "disabled" : ""}>‹ 上一页</button>`;
+  for (const p of _pageWindow(cur, totalPages)) {
+    if (p === "…") html += `<span class="pg-ellipsis">…</span>`;
+    else html += `<button class="pg-btn ${p === cur ? "active" : ""}" data-pg="${p}" data-key="${key}">${p}</button>`;
+  }
+  html += `<button class="pg-btn" data-pg="next" data-key="${key}" ${cur === totalPages ? "disabled" : ""}>下一页 ›</button>`;
+  html += `<span class="pg-info">第 ${from}-${to} 条 / 共 ${total} 条</span>`;
+  html += `<select class="pg-size" data-key="${key}">
+    <option value="10" ${ps.size === 10 ? "selected" : ""}>10/页</option>
+    <option value="20" ${ps.size === 20 ? "selected" : ""}>20/页</option>
+    <option value="50" ${ps.size === 50 ? "selected" : ""}>50/页</option>
+    <option value="100" ${ps.size === 100 ? "selected" : ""}>100/页</option></select>`;
+  pager.innerHTML = html;
+}
+
+/* 全局事件委托：处理带 data-key 的分页控件（admin-att 旧控件无 data-key，不受影响） */
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".pg-btn");
+  if (!btn || btn.disabled) return;
+  const key = btn.dataset.key;
+  if (!key || !state._pg || !state._pg[key]) return;
+  const ps = state._pg[key];
+  const totalPages = Math.max(1, Math.ceil(ps.rows.length / ps.size));
+  const pg = btn.dataset.pg;
+  if (pg === "prev") ps.page = Math.max(1, ps.page - 1);
+  else if (pg === "next") ps.page = Math.min(totalPages, ps.page + 1);
+  else ps.page = parseInt(pg, 10);
+  _drawPagedTable(key);
+});
+document.addEventListener("change", (e) => {
+  const sel = e.target.closest(".pg-size[data-key]");
+  if (!sel) return;
+  const key = sel.dataset.key;
+  const ps = state._pg && state._pg[key];
+  if (!ps) return;
+  ps.size = parseInt(sel.value, 10);
+  ps.page = 1;
+  _drawPagedTable(key);
+});
+
 let lastAdminReimbRows = [];
 async function loadAdminReimb() {
   try {
@@ -942,24 +1040,31 @@ async function loadAdminReimb() {
       statCard("单笔最高", money(r.stats.max_amount), "元");
     const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : "";
     $("#admin-reimb-range").textContent = range ? `统计区间：${range}` : "";
-    const tbody = (r.rows || []).length ? r.rows.map((row) => {
-      const [txt, cls] = REIMB_STATUS[row.status] || [row.status, "tag-gray"];
-      const raw = row.ocr_raw || "";
-      const act = ["submitted", "approving"].includes(row.status)
-        ? `<div class="review-actions">
+    renderPagedTable("adminReimb", {
+      rows: r.rows || [],
+      head: `<thead><tr><th>单号</th><th>员工</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th><th>材料信息</th><th>操作</th></tr></thead>`,
+      tableSel: "#admin-reimb-table",
+      pagerSel: "#admin-reimb-pager",
+      colspan: 8,
+      emptyText: "暂无数据",
+      render: (row) => {
+        const [txt, cls] = REIMB_STATUS[row.status] || [row.status, "tag-gray"];
+        const raw = row.ocr_raw || "";
+        const act = ["submitted", "approving"].includes(row.status)
+          ? `<div class="review-actions">
              <button class="btn-ok" data-review="${row.id}" data-action="approve">通过</button>
              <button class="btn-reject" data-review="${row.id}" data-action="reject">驳回</button>
            </div>` : "";
-      return `<tr><td>#${row.id}</td><td>${esc(row.employee_name)}</td><td>${esc(row.category || "未填")}</td>
-        <td style="text-align:right">${money(row.amount)}</td>
-        <td><span class="tag ${cls}">${txt}</span></td><td>${fmtDT(row.submit_time)}</td>
-        <td><button class="link-btn" data-mat="${row.id}" title="点击查看完整材料信息">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-          ${matPreview(raw)}
-        </button></td>
-        <td>${act}</td></tr>`;
-    }).join("") : '<tr class="empty"><td colspan="8">暂无数据</td></tr>';
-    $("#admin-reimb-table").innerHTML = `<thead><tr><th>单号</th><th>员工</th><th>类目</th><th>金额(元)</th><th>状态</th><th>提交时间</th><th>材料信息</th><th>操作</th></tr></thead><tbody>${tbody}</tbody>`;
+        return `<tr><td>#${row.id}</td><td>${esc(row.employee_name)}</td><td>${esc(row.category || "未填")}</td>
+          <td style="text-align:right">${money(row.amount)}</td>
+          <td><span class="tag ${cls}">${txt}</span></td><td>${fmtDT(row.submit_time)}</td>
+          <td><button class="link-btn" data-mat="${row.id}" title="点击查看完整材料信息">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            ${matPreview(raw)}
+          </button></td>
+          <td>${act}</td></tr>`;
+      }
+    });
   } catch (err) { console.error(err); }
 }
 
@@ -995,8 +1100,14 @@ async function loadAdminSalary() {
       statCard("平均工资", money(r.stats.avg_pay), "元");
     const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : "";
     $("#admin-salary-range").textContent = range ? `统计区间：${range}` : "";
-    // (removed: #admin-salary-analysis element not in HTML)
-    const tbody = (r.rows || []).length ? r.rows.map((row) => `
+    renderPagedTable("adminSalary", {
+      rows: r.rows || [],
+      head: `<thead><tr><th>序号</th><th>工号</th><th>姓名</th><th>岗位</th><th>基本工资</th><th>系数</th><th>绩效奖金</th><th>津贴</th><th>应发合计</th><th>操作</th></tr></thead>`,
+      tableSel: "#admin-salary-table",
+      pagerSel: "#admin-salary-pager",
+      colspan: 10,
+      emptyText: "暂无工资数据",
+      render: (row) => `
       <tr data-id="${esc(row.id)}">
         <td>${esc(row.no)}</td><td>${esc(row.id)}</td><td>${esc(row.name)}</td><td>${esc(row.position || "")}</td>
         <td style="text-align:right">${money(row.base_salary)}</td>
@@ -1005,9 +1116,8 @@ async function loadAdminSalary() {
         <td style="text-align:right">${money(row.allowance)}</td>
         <td style="text-align:right"><b>${money(row.gross_salary)}</b></td>
         <td><button class="btn-ghost btn-sm" data-sal-edit="${esc(row.id)}">编辑</button></td>
-      </tr>`).join("")
-      : `<tr class="empty"><td colspan="10">${emptyHTML("暂无工资数据")}</td></tr>`;
-    $("#admin-salary-table").innerHTML = `<thead><tr><th>序号</th><th>工号</th><th>姓名</th><th>岗位</th><th>基本工资</th><th>系数</th><th>绩效奖金</th><th>津贴</th><th>应发合计</th><th>操作</th></tr></thead><tbody>${tbody}</tbody>`;
+      </tr>`
+    });
   } catch (err) { console.error(err); }
 }
 
@@ -1069,11 +1179,17 @@ async function loadAdminAssess() {
     let url = `/api/assessment/stats?period=${state.adminAssessPeriod}`;
     if (state.adminAssessPeriod === "specific" && state.adminAssessMonth) url += `&target_month=${state.adminAssessMonth}`;
     const r = await api(url);
-    const tbody = (r.rows || []).length ? r.rows.map((row) => `
+    renderPagedTable("adminAssess", {
+      rows: r.rows || [],
+      head: `<thead><tr><th>员工</th><th>查询岗位</th><th>次数</th></tr></thead>`,
+      tableSel: "#admin-assess-table",
+      pagerSel: "#admin-assess-pager",
+      colspan: 3,
+      emptyText: "暂无岗位查询记录",
+      render: (row) => `
       <tr><td>${esc(row.name)}</td><td>${esc(row.position_queried)}</td>
-      <td><span class="tag tag-info">${row.count} 次</span></td></tr>`).join("")
-      : `<tr class="empty"><td colspan="3">${emptyHTML("暂无岗位查询记录")}</td></tr>`;
-    $("#admin-assess-table").innerHTML = `<thead><tr><th>员工</th><th>查询岗位</th><th>次数</th></tr></thead><tbody>${tbody}</tbody>`;
+      <td><span class="tag tag-info">${row.count} 次</span></td></tr>`
+    });
     const range = r.range_end ? `${r.range_start} ~ ${r.range_end}` : "";
     $("#admin-assess-range").textContent = range ? `统计区间：${range}` : "";
   } catch (err) { console.error(err); }
@@ -1127,18 +1243,25 @@ $("#roster-form").addEventListener("submit", async (e) => {
 
 async function loadRoster() {
   try {
-    const data = await api("/api/roster");
-    const rows = data.records || [];
-    const tbody = rows.map((e) => `
-      <tr><td>${e.no}</td><td><b>${esc(e.name)}</b></td><td>${e.emp_id}</td>
+  const data = await api("/api/roster");
+  const rows = data.records || [];
+  renderPagedTable("roster", {
+    rows,
+    head: `<thead><tr><th>序号</th><th>姓名</th><th>工号</th><th>部门</th><th>岗位</th><th>权限范围</th><th>角色</th><th>操作</th></tr></thead>`,
+    tableSel: "#roster-table",
+    pagerSel: "#roster-pager",
+    colspan: 8,
+    emptyText: "暂无员工",
+    render: (e) => `
+    <tr><td>${e.no}</td><td><b>${esc(e.name)}</b></td><td>${e.emp_id}</td>
       <td>${esc(e.department)}</td><td>${esc(e.position)}</td>
       <td>${(e.permissions || []).map((p) => `<span class="tag tag-gray">${esc(p)}</span>`).join(" ") || "-"}</td>
       <td>${e.role === "manager" ? '<span class="tag tag-info">管理者</span>' : '<span class="tag">员工</span>'}</td>
       <td><div class="review-actions">
         <button class="btn-ghost btn-sm" data-edit="${e.id}">编辑</button>
         <button class="btn-reject" data-del="${e.id}">删除</button>
-      </div></td></tr>`).join("");
-    $("#roster-table").innerHTML = `<thead><tr><th>序号</th><th>姓名</th><th>工号</th><th>部门</th><th>岗位</th><th>权限范围</th><th>角色</th><th>操作</th></tr></thead><tbody>${tbody}</tbody>`;
+      </div></td></tr>`
+  });
   } catch (err) { console.error(err); }
 }
 
