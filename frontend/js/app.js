@@ -1752,11 +1752,22 @@ scheduleRandomTrick();
 (function initPetPos() {
   try {
     const s = JSON.parse(localStorage.getItem("pet_pos") || "null");
-    if (s && typeof s.x === "number") {
+    const bw = bubble.offsetWidth  || 80;
+    const bh = bubble.offsetHeight || 80;
+    /* 校验 x/y 都是有效数字，且 clamp 到视口内（留 20px 边距） */
+    if (s && typeof s.x === "number" && typeof s.y === "number"
+        && !isNaN(s.x) && !isNaN(s.y)) {
+      const x = Math.max(20, Math.min(s.x, innerWidth  - bw  - 20));
+      const y = Math.max(20, Math.min(s.y, innerHeight - bh  - 20));
       bubble.style.right = "auto"; bubble.style.bottom = "auto";
-      bubble.style.left = s.x + "px"; bubble.style.top = s.y + "px";
+      bubble.style.left = x + "px"; bubble.style.top = y + "px";
+    } else {
+      /* 脏数据：清除缓存，让宠物回到默认右下角 */
+      localStorage.removeItem("pet_pos");
     }
-  } catch(_) {}
+  } catch(_) {
+    localStorage.removeItem("pet_pos");
+  }
 })();
 
 function syncPanelToPet() {
@@ -1823,7 +1834,13 @@ document.addEventListener("pointerup", (e) => {
 });
 
 function savePetPos() {
-  try { localStorage.setItem("pet_pos", JSON.stringify({x:parseFloat(bubble.style.left),y:parseFloat(bubble.style.top)})); } catch(_){}
+  try {
+    const x = parseFloat(bubble.style.left);
+    const y = parseFloat(bubble.style.top);
+    if (!isNaN(x) && !isNaN(y)) {
+      localStorage.setItem("pet_pos", JSON.stringify({x, y}));
+    }
+  } catch(_){}
 }
 
 /* ===== 桌宠物理引擎：松手后按初速度做抛物运动，触底/触边弹性反弹 ===== */
