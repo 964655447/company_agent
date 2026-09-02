@@ -42,6 +42,66 @@ async function api(path, opts = {}) {
   return data;
 }
 
+/* 流式 POST：优先按 SSE（text/event-stream）逐块解析；若后端仍是旧 JSON 版本，
+ * 自动降级为一次性解析（保证"后端没重启也不崩"）。
+ * handlers: { onDelta(累计文本由调用方拼接), onMeta({ai,conversation_id}), onError(err) }
+ * 返回最后一份 meta（含 conversation_id / ai）。
+ */
+async function streamPost(path, opts = {}, handlers = {}) {
+  const { onDelta, onMeta, onError } = handlers;
+  const headers = { ...(opts.headers || {}) };
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (opts.json !== undefined) {
+    headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(opts.json);
+  }
+  const res = await fetch(API + path, { ...opts, headers });
+  if (!res.ok) {
+    let msg = `请求失败（${res.status}）`;
+    try { const d = await res.json(); if (d && d.detail) msg = d.detail; } catch (e) {}
+    if (res.status === 401) { logout(true); }
+    throw new Error(msg);
+  }
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("text/event-stream")) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let meta = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) !== -1) {
+        const raw = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let event = "message";
+        const dataLines = [];
+        raw.split("\n").forEach((line) => {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+        });
+        const data = dataLines.join("\n");
+        if (event === "delta") {
+          if (onDelta) onDelta(data);
+        } else if (event === "meta") {
+          try { meta = JSON.parse(data); if (onMeta) onMeta(meta); } catch (e) {}
+        }
+        // done 帧无附加信息，meta 已在前面到位，忽略即可
+      }
+    }
+    return meta;
+  }
+  // 旧后端（普通 JSON）：兼容分支，避免"前端新+后端旧=空白"
+  const data = await res.json();
+  if (onDelta) onDelta(data.reply || "");
+  const m = { ai: data.ai, conversation_id: data.conversation_id, module: data.module };
+  if (onMeta) onMeta(m);
+  return m;
+}
+
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -1378,22 +1438,23 @@ async function sendChat(message, fileObj = null) {
   const btn = $("#chat-send");
   btn.disabled = true;
   setPetAction("eating");
+  let acc = "";
   try {
-    let r;
+    const onDelta = (t) => { acc += t; typing.innerHTML = renderText(acc); };
+    const onMeta = (m) => { if (m && m.conversation_id) state.chatConvId = m.conversation_id; };
     if (fileObj) {
       const fd = new FormData();
       if (message && message.trim()) fd.append("message", message.trim());
       if (state.chatConvId) fd.append("conversation_id", state.chatConvId);
       fd.append("file", fileObj);
-      r = await api("/api/chat/file", { method: "POST", body: fd });
+      // /api/chat/file 仍是普通 JSON，streamPost 自动走 fallback 分支
+      await streamPost("/api/chat/file", { method: "POST", body: fd }, { onDelta, onMeta });
     } else {
-      r = await api("/api/chat", {
+      await streamPost("/api/chat", {
         method: "POST",
         json: { message: message, conversation_id: state.chatConvId },
-      });
+      }, { onDelta, onMeta });
     }
-    if (r.conversation_id) state.chatConvId = r.conversation_id;
-    typing.innerHTML = renderText(r.reply);
     setPetAction("talk");
     setTimeout(() => { if (_petAction === "talk") setPetAction("idle"); }, 3200);
   } catch (err) {
@@ -1522,7 +1583,7 @@ function appendFloatTyping() {
   return el;
 }
 
-/* 统一发送：文字走 /api/chat（统一智能体）；带文件走 /api/chat/file */
+/* 统一发送：文字走 /api/chat（统一智能体，SSE 流式）；带文件走 /api/chat/file（JSON） */
 async function askFloat(message, fileObj = null) {
   if (!message || !message.trim() && !fileObj) return;
   if (!fileObj) appendFloatMsg("user", message.trim());
@@ -1530,19 +1591,19 @@ async function askFloat(message, fileObj = null) {
   const typing = appendFloatTyping();
   $("#float-send").disabled = true;
   setPetAction("eating");   /* 等待回复：吃饭动作 */
+  let acc = "";
   try {
-    let r;
+    const onDelta = (t) => { acc += t; typing.innerHTML = renderText(acc); };
+    const onMeta = (m) => { if (m && m.conversation_id) state.floatConvId = m.conversation_id; };
     if (fileObj) {
       const fd = new FormData();
       if (message && message.trim()) fd.append("message", message.trim());
       fd.append("file", fileObj);
-      r = await api("/api/chat/file", { method: "POST", body: fd });
+      await streamPost("/api/chat/file", { method: "POST", body: fd }, { onDelta, onMeta });
     } else {
-      r = await api("/api/chat", { method: "POST",
-        json: { message, conversation_id: state.floatConvId } });
+      await streamPost("/api/chat", { method: "POST",
+        json: { message, conversation_id: state.floatConvId } }, { onDelta, onMeta });
     }
-    if (r.conversation_id) state.floatConvId = r.conversation_id;
-    typing.innerHTML = renderText(r.reply);
     setPetAction("talk");
     setTimeout(() => { if (_petAction === "talk") setPetAction("idle"); }, 3200);
   } catch (err) {

@@ -145,6 +145,102 @@ async def call_dify_agent(user, query: str,
         return "", False, conversation_id
 
 
+async def stream_dify_agent(user, query: str,
+                            conversation_id: str | None = None,
+                            files: list[str] | None = None):
+    """流式版生成器：逐块 yield 事件字典，供 chat 接口转 SSE。
+
+    yield 的事件字典形态：
+      {"delta": "<增量文本>"}        —— 一块增量（已做全量/增量去重，可直接拼接）
+      {"meta":  {"ai": bool, "conversation_id": str|None}}  —— 首块元信息
+      {"done":  True}                —— 结束标记
+
+    降级（无 Key / 异常 / Dify 无有效内容）：yield 通用提示文本 + meta(ai=False)。
+    考勤类本地兜底不在此处理，由 chat.py 统一前置判断（本地可离线、不依赖 Dify）。
+    """
+    if not DIFY_AGENT_KEY:
+        yield {"meta": {"ai": False, "conversation_id": conversation_id}}
+        yield {"delta": "智能助手尚未接入（请在 backend/.env 配置 DIFY_AGENT_KEY，"
+                         "并在 Dify 中将「考核报告 / 岗位出题 / 阅卷」工作流发布为统一智能体的工具）"}
+        yield {"done": True}
+        return
+    try:
+        conv_id = conversation_id
+        enriched_query = _identity_context(user) + (query or "")
+        payload = {
+            "query": enriched_query,
+            "response_mode": "streaming",
+            "user": str(user.employee_id),
+            "inputs": _user_inputs(user),
+            "auto_generate_name": False,
+        }
+        if conv_id:
+            payload["conversation_id"] = conv_id
+        if files:
+            payload["files"] = [
+                {"type": "document", "transfer_method": "local_file",
+                 "upload_file_id": fid}
+                for fid in files
+            ]
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(100.0, connect=10.0)) as client:
+            async with client.stream(
+                "POST",
+                f"{DIFY_BASE_URL.rstrip('/')}/chat-messages",
+                headers={
+                    "Authorization": f"Bearer {DIFY_AGENT_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as resp:
+                resp.raise_for_status()
+                parts = []
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:]
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    cid = chunk.get("conversation_id")
+                    if cid:
+                        conv_id = cid
+                    content = chunk.get("answer") or ""
+                    if not content:
+                        continue
+                    # 去重：Dify 可能既发增量又发整段全量，避免重复拼接
+                    prev = "".join(parts)
+                    if prev and content.startswith(prev):
+                        parts = [content]
+                    elif prev:
+                        ov = 0
+                        for i in range(1, min(len(prev), len(content)) + 1):
+                            if prev.endswith(content[:i]):
+                                ov = i
+                        delta = content[ov:]
+                        if delta:
+                            parts.append(delta)
+                            yield {"delta": delta}
+                    else:
+                        parts.append(content)
+                        yield {"delta": content}
+                full = "".join(parts).strip()
+                if not full:
+                    yield {"meta": {"ai": False, "conversation_id": conv_id}}
+                    yield {"delta": "智能体未返回内容"}
+                    yield {"done": True}
+                    return
+                yield {"meta": {"ai": True, "conversation_id": conv_id}}
+                yield {"done": True}
+    except Exception:
+        yield {"meta": {"ai": False, "conversation_id": conversation_id}}
+        yield {"delta": "（智能体暂时不可用，请稍后重试）"}
+        yield {"done": True}
+
+
 def upload_dify_file(content: bytes, filename: str) -> str | None:
     """把文件上传到 Dify 拿 upload_file_id（供工作流/智能体引用）。
 
